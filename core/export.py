@@ -1,117 +1,206 @@
 """
-Funciones de exportación para YoCreo Suite
-Soporta: Word (.docx), PDF (.pdf), Excel (.xlsx)
-Incluye: Botón de copiar al portapapeles
+Funciones de exportacion para YoCreo Suite
+Protocolo Estandar v2.0
+- PDFs con reportlab en memoria
+- Boton copiar HTML/JS ancho completo
+- Encabezado con boton de manual
 """
 
 import io
+import os
+import base64
 import streamlit as st
-from fpdf import FPDF
+import streamlit.components.v1 as components
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from docx import Document
-import pandas as pd
+
+# Ruta de manuales
+MANUALES_PATH = os.path.join(os.path.dirname(__file__), "..", "manuales")
 
 
-# ==================== COPIAR AL PORTAPAPELES ====================
+# ==================== ENCABEZADO CON MANUAL ====================
 
-def copy_button(text, button_text="Copiar", key=None):
+def render_encabezado(practica_key, titulo, descripcion):
     """
-    Muestra un botón que copia texto plano al portapapeles
-    (Función legacy - usar text_area_with_copy para el nuevo estilo)
-    """
-    import random
-    escaped_text = text.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${').replace('\n', '\\n').replace('\r', '').replace("'", "\\'")
-    btn_id = f"copy_btn_{key or random.randint(1000, 9999)}"
+    Renderiza el encabezado de una practica con boton de manual
 
-    copy_html = f"""
-    <button style="background:#F26B3A;color:white;border:none;padding:8px 16px;border-radius:5px;cursor:pointer;"
-            id="{btn_id}" onclick="
-                var texto = `{escaped_text}`;
-                var textarea = document.createElement('textarea');
-                textarea.value = texto;
-                textarea.style.position = 'fixed';
-                textarea.style.opacity = '0';
-                document.body.appendChild(textarea);
-                textarea.select();
-                document.execCommand('copy');
-                document.body.removeChild(textarea);
-                document.getElementById('{btn_id}').innerHTML='Copiado!';
-                setTimeout(function(){{document.getElementById('{btn_id}').innerHTML='{button_text}';}},2000);
-            ">
-        {button_text}
-    </button>
+    Args:
+        practica_key: Key de la practica (ej: 'priorizador_tareas')
+        titulo: Titulo de la practica
+        descripcion: Descripcion breve
     """
-    st.components.v1.html(copy_html, height=45)
+    # Verificar si existe el manual
+    pdf_path = os.path.join(MANUALES_PATH, f"{practica_key}.pdf")
+    tiene_manual = os.path.exists(pdf_path)
+
+    if tiene_manual:
+        col1, col2 = st.columns([0.92, 0.08])
+        with col1:
+            st.markdown(f"### {titulo}")
+        with col2:
+            if st.button("?", key=f"manual_btn_{practica_key}", help=f"Ver Manual de {titulo}"):
+                # Abrir PDF en nueva pestaña
+                with open(pdf_path, "rb") as f:
+                    pdf_base64 = base64.b64encode(f.read()).decode()
+
+                js_code = f'''
+                <script>
+                    const base64Data = "{pdf_base64}";
+                    const byteCharacters = atob(base64Data);
+                    const byteNumbers = new Array(byteCharacters.length);
+                    for (let i = 0; i < byteCharacters.length; i++) {{
+                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+                    }}
+                    const byteArray = new Uint8Array(byteNumbers);
+                    const blob = new Blob([byteArray], {{type: 'application/pdf'}});
+                    const blobUrl = URL.createObjectURL(blob);
+                    window.open(blobUrl, '_blank');
+                </script>
+                '''
+                components.html(js_code, height=0, width=0)
+    else:
+        st.markdown(f"### {titulo}")
+
+    st.write(descripcion)
 
 
-def text_area_with_copy(label, text, key, height=120):
+# ==================== BOTON COPIAR (Protocolo Estandar) ====================
+
+def copy_button_component(text_to_copy, key="copy"):
     """
-    Muestra un text_area editable con botón de copiar pequeño
+    Muestra boton copiar HTML/JS ancho completo (Naranja)
+    Segun protocolo: debajo del area de texto
+    """
+    if not text_to_copy:
+        return
+
+    text_js = text_to_copy.replace('`', '\\`').replace('${', '\\${').replace('\n', '\\n').replace('\r', '')
+
+    component_html = f"""
+    <head>
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    </head>
+    <style>
+        body {{ margin: 0; padding: 0; }}
+        .copy-btn {{
+            width: 100%;
+            background-color: #FF6B4E;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 0.75rem;
+            font-family: 'Inter', sans-serif;
+            font-weight: 700;
+            font-size: 16px;
+            cursor: pointer;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            transition: transform 0.1s;
+        }}
+        .copy-btn:hover {{
+            transform: translateY(-2px);
+            background-color: #e65539;
+        }}
+    </style>
+    <button class="copy-btn" id="btn_{key}" onclick="copyToClipboard_{key}()">Copiar al Portapapeles</button>
+    <script>
+        function copyToClipboard_{key}() {{
+            const text = `{text_js}`;
+            navigator.clipboard.writeText(text).then(() => {{
+                const btn = document.getElementById('btn_{key}');
+                btn.innerText = 'Copiado';
+                btn.style.backgroundColor = '#28a745';
+                setTimeout(() => {{
+                    btn.innerText = 'Copiar al Portapapeles';
+                    btn.style.backgroundColor = '#FF6B4E';
+                }}, 2000);
+            }});
+        }}
+    </script>
+    """
+    components.html(component_html, height=60)
+
+
+def text_area_with_copy(label, text, key, height=300):
+    """
+    Muestra un text_area editable grande (editor unico)
+    El boton copiar se agrega por separado con copy_button_component
 
     Args:
         label: Etiqueta del campo
         text: Texto inicial
-        key: Key único para el componente
+        key: Key unico para el componente
         height: Altura del text_area
 
     Returns:
         str: El texto editado
     """
-    import random
-
-    # Text area editable
     edited_text = st.text_area(label, value=text, height=height, key=key)
-
-    # Escapar texto para JavaScript
-    escaped_text = edited_text.replace('\\', '\\\\').replace('`', '\\`').replace('${', '\\${').replace('\n', '\\n').replace('\r', '').replace("'", "\\'")
-
-    # ID único
-    btn_id = f"copy_{key or random.randint(1000, 9999)}"
-
-    # Botón pequeño estilo naranja - copia texto plano sin formato
-    copy_html = f"""
-    <button id="{btn_id}" onclick="
-        var texto = `{escaped_text}`;
-        var textarea = document.createElement('textarea');
-        textarea.value = texto;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-        document.getElementById('{btn_id}').innerHTML = 'Copiado!';
-        document.getElementById('{btn_id}').style.background = '#28a745';
-        setTimeout(function() {{
-            document.getElementById('{btn_id}').innerHTML = 'Copiar';
-            document.getElementById('{btn_id}').style.background = '#F26B3A';
-        }}, 1500);
-    " style="
-        background: #F26B3A;
-        color: white;
-        border: none;
-        padding: 4px 12px;
-        border-radius: 4px;
-        cursor: pointer;
-        font-size: 12px;
-    ">Copiar</button>
-    """
-    st.components.v1.html(copy_html, height=35)
-
     return edited_text
 
 
-def editable_output_with_copy(label, text, key, height=120):
-    """
-    Alias para text_area_with_copy (compatibilidad)
-    """
-    return text_area_with_copy(label, text, key, height)
+# ==================== PDF con ReportLab ====================
 
+def create_pdf_reportlab(titulo, secciones):
+    """
+    Crea un documento PDF profesional con reportlab en memoria
 
-def clean_latin(text):
-    """Limpia caracteres para compatibilidad con PDF (latin-1)"""
-    if not text:
-        return ""
-    return text.encode('latin-1', 'replace').decode('latin-1')
+    Args:
+        titulo: Titulo del documento
+        secciones: Lista de tuplas (titulo_seccion, contenido)
+
+    Returns:
+        bytes: Contenido del archivo PDF
+    """
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    elements = []
+
+    styles = getSampleStyleSheet()
+
+    # Estilo titulo
+    title_style = ParagraphStyle(
+        'CustomTitle',
+        parent=styles['Heading1'],
+        alignment=TA_CENTER,
+        fontSize=18,
+        spaceAfter=20
+    )
+
+    # Estilo subtitulo seccion
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading2'],
+        fontSize=14,
+        textColor='#4E32AD',
+        spaceAfter=10
+    )
+
+    # Estilo normal
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=11,
+        leading=14,
+        alignment=TA_LEFT
+    )
+
+    # Titulo principal
+    elements.append(Paragraph(titulo, title_style))
+    elements.append(Spacer(1, 20))
+
+    # Secciones
+    for seccion_titulo, contenido in secciones:
+        elements.append(Paragraph(seccion_titulo, heading_style))
+        texto_formateado = contenido.replace("\n", "<br/>")
+        elements.append(Paragraph(texto_formateado, normal_style))
+        elements.append(Spacer(1, 15))
+
+    doc.build(elements)
+    buffer.seek(0)
+    return buffer.getvalue()
 
 
 # ==================== WORD ====================
@@ -121,7 +210,7 @@ def create_word_document(titulo, secciones):
     Crea un documento Word con secciones
 
     Args:
-        titulo: Título del documento
+        titulo: Titulo del documento
         secciones: Lista de tuplas (titulo_seccion, contenido)
 
     Returns:
@@ -139,146 +228,57 @@ def create_word_document(titulo, secciones):
     return bio.getvalue()
 
 
-def get_word_mime():
-    """Retorna el MIME type para Word"""
-    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-
-
-# ==================== PDF ====================
-
-class YoCreoPDF(FPDF):
-    """Clase PDF personalizada con header de YoCreo"""
-
-    def __init__(self, titulo="YoCreo Suite"):
-        super().__init__()
-        self.titulo_doc = titulo
-
-    def header(self):
-        self.set_font('Arial', 'B', 14)
-        self.set_text_color(91, 45, 144)  # Morado
-        self.cell(0, 10, clean_latin(self.titulo_doc), 0, 1, 'C')
-        self.ln(5)
-
-    def footer(self):
-        self.set_y(-15)
-        self.set_font('Arial', 'I', 8)
-        self.set_text_color(128, 128, 128)
-        self.cell(0, 10, f'YoCreo Suite - Pagina {self.page_no()}', 0, 0, 'C')
-
-
-def create_pdf_document(titulo, secciones):
-    """
-    Crea un documento PDF con secciones
-
-    Args:
-        titulo: Título del documento
-        secciones: Lista de tuplas (titulo_seccion, contenido)
-
-    Returns:
-        bytes: Contenido del archivo PDF
-    """
-    pdf = YoCreoPDF(titulo)
-    pdf.add_page()
-
-    for seccion_titulo, contenido in secciones:
-        # Título de sección
-        pdf.set_font("Arial", 'B', 12)
-        pdf.set_text_color(242, 107, 58)  # Naranja
-        pdf.cell(0, 10, clean_latin(seccion_titulo), 0, 1)
-
-        # Contenido
-        pdf.set_text_color(51, 51, 51)  # Gris oscuro
-        pdf.set_font("Arial", size=11)
-        pdf.multi_cell(0, 6, clean_latin(contenido))
-        pdf.ln(5)
-
-    return pdf.output(dest='S').encode('latin-1')
-
+# ==================== UTILIDADES ====================
 
 def get_pdf_mime():
     """Retorna el MIME type para PDF"""
     return "application/pdf"
 
 
-# ==================== EXCEL ====================
+def get_word_mime():
+    """Retorna el MIME type para Word"""
+    return "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 
-def create_excel_document(data, sheet_name="Datos"):
+
+def show_download_section(st, contenido_texto, nombre_default="documento"):
     """
-    Crea un documento Excel
+    Muestra la seccion de descarga estandar (CAJA 4)
+    Sin emojis, con selector de formato
 
     Args:
-        data: Lista de diccionarios o DataFrame
-        sheet_name: Nombre de la hoja
-
-    Returns:
-        bytes: Contenido del archivo Excel
-    """
-    if isinstance(data, list):
-        df = pd.DataFrame(data)
-    else:
-        df = data
-
-    output = io.BytesIO()
-    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-        df.to_excel(writer, index=False, sheet_name=sheet_name)
-    return output.getvalue()
-
-
-def get_excel_mime():
-    """Retorna el MIME type para Excel"""
-    return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-
-
-# ==================== UTILIDADES ====================
-
-def show_download_section(st, resultados, texto_original, nombre_default="Documento"):
-    """
-    Muestra la sección de descarga estándar
-
-    Args:
-        st: Módulo streamlit
-        resultados: Diccionario con los resultados
-        texto_original: Texto original del usuario
+        st: Modulo streamlit
+        contenido_texto: Texto completo a exportar
         nombre_default: Nombre por defecto del archivo
     """
-    st.subheader("📥 Descargar Archivo")
-
-    col_name, col_type = st.columns([2, 1])
-    with col_name:
+    col1, col2 = st.columns(2)
+    with col1:
         nombre_archivo = st.text_input(
-            "Nombre del archivo:",
-            value=nombre_default,
-            help="Sin extensión"
+            "Nombre del archivo",
+            value=nombre_default
         )
-    with col_type:
-        tipo_archivo = st.radio(
-            "Formato:",
-            ["Word (.docx)", "PDF (.pdf)"],
-            horizontal=True
+    with col2:
+        formato = st.selectbox(
+            "Formato",
+            ["PDF", "Texto (.txt)"]
         )
 
-    # Preparar secciones
-    secciones = []
-    if texto_original:
-        secciones.append(("Original", texto_original))
-    for key, value in resultados.items():
-        if value and key != "error":
-            secciones.append((key.title(), value))
-
-    # Generar archivo según tipo
-    if tipo_archivo == "Word (.docx)":
-        data = create_word_document("Documento YoCreo", secciones)
-        mime = get_word_mime()
-        ext = "docx"
+    if formato == "PDF":
+        pdf_data = create_pdf_reportlab(
+            nombre_default.replace("_", " ").title(),
+            [("Contenido", contenido_texto)]
+        )
+        st.download_button(
+            "Descargar PDF",
+            data=pdf_data,
+            file_name=f"{nombre_archivo}.pdf",
+            mime="application/pdf",
+            use_container_width=True
+        )
     else:
-        data = create_pdf_document("Documento YoCreo", secciones)
-        mime = get_pdf_mime()
-        ext = "pdf"
-
-    st.download_button(
-        label=f"💾 Descargar {tipo_archivo}",
-        data=data,
-        file_name=f"{nombre_archivo}.{ext}",
-        mime=mime,
-        use_container_width=True
-    )
+        st.download_button(
+            "Descargar TXT",
+            data=contenido_texto,
+            file_name=f"{nombre_archivo}.txt",
+            mime="text/plain",
+            use_container_width=True
+        )

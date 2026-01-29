@@ -1,6 +1,6 @@
 """
 Cliente de IA para YoCreo Suite
-Actualmente usa Google Gemini, preparado para migrar a Claude
+Protocolo: gemini-2.5-flash
 """
 
 import streamlit as st
@@ -15,24 +15,28 @@ def init_ai():
         genai.configure(api_key=api_key)
         return True
     except Exception as e:
-        st.error(f"⚠️ Error al configurar IA: {e}")
-        st.info("Asegúrate de tener GOOGLE_API_KEY en .streamlit/secrets.toml")
+        st.markdown(f'''
+            <div class="custom-error">
+                Error al configurar IA: {e}<br>
+                Asegurate de tener GOOGLE_API_KEY en .streamlit/secrets.toml
+            </div>
+        ''', unsafe_allow_html=True)
         return False
 
 
 def generate_response(prompt, max_tokens=None):
     """
-    Genera una respuesta usando el modelo de IA configurado
+    Genera una respuesta usando gemini-2.5-flash
 
     Args:
         prompt: El texto del prompt
-        max_tokens: Tokens máximos (opcional, usa config si no se especifica)
+        max_tokens: Tokens maximos (opcional)
 
     Returns:
         str: Texto de respuesta o None si hay error
     """
     try:
-        tokens = max_tokens or AI_CONFIG.get("max_tokens", 4096)
+        tokens = max_tokens or AI_CONFIG.get("max_tokens", 8192)
         generation_config = genai.types.GenerationConfig(
             max_output_tokens=tokens
         )
@@ -40,7 +44,11 @@ def generate_response(prompt, max_tokens=None):
         response = model.generate_content(prompt, generation_config=generation_config)
         return response.text
     except Exception as e:
-        st.error(f"Error al generar respuesta: {e}")
+        st.markdown(f'''
+            <div class="custom-error">
+                Error al generar respuesta: {e}
+            </div>
+        ''', unsafe_allow_html=True)
         return None
 
 

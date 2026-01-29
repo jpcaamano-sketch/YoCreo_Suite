@@ -1,12 +1,17 @@
 """
 Core modules for YoCreo Suite
+Protocolo Estandar v2.0
 """
 
 from .config import COLORS, AI_CONFIG, APP_INFO, PRACTICAS
-from .styles import apply_styles, show_logo, show_header, get_css
-from .ai_client import init_ai, generate_response, generate_structured_response
+from .styles import apply_styles, get_css
+from .ai_client import init_ai, generate_response
 from .export import (
-    create_word_document, create_pdf_document, create_excel_document,
-    get_word_mime, get_pdf_mime, get_excel_mime,
-    show_download_section
+    copy_button_component,
+    create_pdf_reportlab,
+    create_word_document,
+    get_pdf_mime,
+    get_word_mime,
+    show_download_section,
+    render_encabezado
 )
