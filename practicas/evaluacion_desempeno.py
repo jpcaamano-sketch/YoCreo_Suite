@@ -1,219 +1,160 @@
 """
 Evaluacion de Desempeno - YoCreo Suite
-Detector de Sesgos Inconscientes en evaluaciones
+Protocolo Estandar v2.0
 """
 
 import streamlit as st
 import json
-import re
+
 from core.config import PRACTICAS
 from core.ai_client import generate_response
-from core.export import (
-    create_word_document, create_pdf_document,
-    get_word_mime, get_pdf_mime, copy_button, text_area_with_copy
-)
+from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
 
 
 def limpiar_json(texto):
     """Limpia la respuesta de la IA para obtener JSON valido."""
     try:
-        texto = texto.replace("```json", "").replace("```", "").strip()
-        return json.loads(texto)
+        texto_limpio = texto.replace("```json", "").replace("```", "").strip()
+        return json.loads(texto_limpio)
     except:
-        match = re.search(r'(\{.*\}|\[.*\])', texto, re.DOTALL)
-        if match:
-            try:
-                return json.loads(match.group(0))
-            except:
-                return None
         return None
 
 
-def analizar_evaluacion(texto_evaluacion):
-    """Analiza el texto en busca de sesgos inconscientes."""
-
+def analizar_sesgos_ai(texto_evaluacion):
+    """Analiza sesgos inconscientes en una evaluacion de desempeno."""
     prompt = f"""Actua como un Experto en Diversidad e Inclusion. Analiza esta evaluacion de desempeno.
 
 TEXTO: "{texto_evaluacion}"
 
 INSTRUCCIONES:
-1. Detecta sesgos (Genero, Recencia, Efecto Halo, Subjetividad, Afinidad, Confirmacion).
-2. Reescribe el texto eliminando los sesgos.
+1. Detecta sesgos inconscientes (Genero, Recencia, Halo, Subjetividad, Afinidad).
+2. Reescribe el texto eliminando los sesgos, dejandolo neutral y basado en hechos.
 
-RESPONDE SOLO JSON:
+REGLAS DE FORMATO:
+1. NO uses Markdown (ni negritas **, ni cursivas *).
+2. Texto plano limpio.
+3. En la lista de sesgos, usa vinetas simples (-).
+
+Responde EXCLUSIVAMENTE con un JSON valido:
 {{
-    "puntaje_neutralidad": (1-100),
-    "analisis_detallado": [
-        {{
-            "frase_original": "Cita exacta del texto",
-            "tipo_sesgo": "Ej: Subjetividad / Genero",
-            "explicacion": "Por que es un sesgo",
-            "sugerencia": "Como decirlo mejor"
-        }}
-    ],
-    "texto_reescrito": "La version final completa y neutral."
+    "puntaje": "Un numero del 1 al 100 indicando nivel de neutralidad actual.",
+    "analisis": "Lista con vinetas (-) de los sesgos especificos encontrados y por que.",
+    "texto_neutral": "La version reescrita completa, profesional y objetiva."
 }}"""
-
     response = generate_response(prompt)
     if response:
-        return limpiar_json(response)
+        data = limpiar_json(response)
+        if data:
+            for key in data:
+                if isinstance(data[key], str):
+                    data[key] = data[key].replace("**", "").replace("##", "").replace("[", "").replace("]", "")
+            return data
     return None
 
 
 def render():
-    """Renderiza la practica Evaluacion de Desempeno"""
+    """Renderiza la practica Evaluacion de Desempeno."""
     info = PRACTICAS["evaluacion_desempeno"]
 
-    # Header
-    st.header(f"{info['icono']} {info['titulo']}")
-    st.write(info['descripcion'])
-
-    with st.expander("Tipos de sesgos que detectamos"):
-        st.markdown("""
-        - **Sesgo de Genero:** Usar adjetivos diferentes para hombres y mujeres
-        - **Sesgo de Recencia:** Juzgar solo por eventos recientes
-        - **Efecto Halo:** Una caracteristica positiva influye todo el juicio
-        - **Subjetividad:** Opiniones sin hechos concretos
-        - **Sesgo de Afinidad:** Favorecer a quienes son similares a nosotros
-        - **Sesgo de Confirmacion:** Buscar evidencia que confirme prejuicios
-        """)
-
-    # Input
+    # ==================== CAJA 1: ENCABEZADO ====================
     with st.container(border=True):
-        st.markdown("**Texto de la evaluación a auditar:**")
-        texto_input = st.text_area(
-            "Pega aqui el borrador de la evaluacion:",
-            height=200,
-            placeholder="Ej: Laura es muy emocional y siento que a veces no se enfoca en lo importante. Es buena persona pero...",
-            label_visibility="collapsed"
-        )
+        render_encabezado("evaluacion_desempeno", info['titulo'], info['descripcion'])
 
-    # Estado
+        with st.expander("Ayuda: Tipos de Sesgos"):
+            st.write("""
+            Esta herramienta analiza tus borradores de evaluacion para asegurar que sean justos:
+
+            - Genero: Adjetivos diferentes para hombres/mujeres.
+            - Recencia: Juzgar solo por lo ultimo que paso.
+            - Halo: Una caracteristica buena tapa todo lo malo.
+            - Subjetividad: Opiniones en lugar de hechos.
+            """)
+
+    # Estado de sesion
     if 'sesgos_resultado' not in st.session_state:
         st.session_state.sesgos_resultado = None
-    if 'sesgos_texto_original' not in st.session_state:
-        st.session_state.sesgos_texto_original = None
-    if 'sesgos_historial' not in st.session_state:
-        st.session_state.sesgos_historial = []
 
-    # Boton de accion
-    if st.button("Auditar Texto", type="primary", use_container_width=True):
-        if not texto_input or len(texto_input) < 20:
-            st.warning("Escribe un texto mas completo para analizar.")
-        else:
-            with st.spinner("Analizando frase por frase..."):
-                st.session_state.sesgos_resultado = analizar_evaluacion(texto_input)
-                st.session_state.sesgos_texto_original = texto_input
+    # ==================== CAJA 2: INPUTS ====================
+    with st.container(border=True):
+        st.markdown("#### Texto a Auditar")
 
-                # Historial
-                if st.session_state.sesgos_resultado:
-                    st.session_state.sesgos_historial.insert(0, {
-                        "texto": texto_input[:50] + "...",
-                        "puntaje": st.session_state.sesgos_resultado.get('puntaje_neutralidad', 0),
-                        "resultado": st.session_state.sesgos_resultado
-                    })
-                    st.session_state.sesgos_historial = st.session_state.sesgos_historial[:5]
+        texto_input = st.text_area(
+            "Ingresa el borrador de la evaluacion:",
+            placeholder="Ej: Laura es muy emocional y siento que no se enfoca en lo importante...",
+            height=150,
+            key="eval_texto"
+        )
 
-    # Mostrar resultados
-    if st.session_state.sesgos_resultado:
-        datos = st.session_state.sesgos_resultado
+        if st.button("Auditar Texto", use_container_width=True):
+            if texto_input and len(texto_input) >= 10:
+                with st.spinner("Detectando sesgos..."):
+                    data = analizar_sesgos_ai(texto_input)
+                    if data:
+                        resultado = f"""PUNTAJE DE NEUTRALIDAD: {data['puntaje']}/100
 
-        st.divider()
+ANALISIS DE SESGOS:
+{data['analisis']}
 
-        # Seccion 2: Resultados
-        st.subheader("2. Resultados del Analisis")
+--------------------------------------------------
 
-        # Barra de puntaje
-        score = datos.get("puntaje_neutralidad", 0)
-        col_score, col_msg = st.columns([3, 1])
-        with col_score:
-            st.progress(score / 100)
-        with col_msg:
-            if score >= 80:
-                st.success(f"**{score}/100**")
-            elif score >= 50:
-                st.warning(f"**{score}/100**")
+VERSION CORREGIDA (Neutral):
+{data['texto_neutral']}"""
+                        st.session_state.sesgos_resultado = resultado
+                    else:
+                        st.markdown('<div class="custom-error">No se pudo analizar el texto. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:
-                st.error(f"**{score}/100**")
+                st.markdown('<div class="custom-warning">Escribe un texto mas completo para analizar (minimo 10 caracteres).</div>', unsafe_allow_html=True)
 
-        # Lista de alertas
-        alertas = datos.get("analisis_detallado", [])
-        if alertas:
-            st.info(f"Se detectaron {len(alertas)} puntos de mejora.")
-            for i, item in enumerate(alertas):
-                with st.expander(f"{item.get('tipo_sesgo', 'Sesgo')}: \"{item.get('frase_original', '')[:40]}...\""):
-                    st.markdown(f"**Frase original:** *{item.get('frase_original')}*")
-                    st.markdown(f"**Por que es sesgo:** {item.get('explicacion')}")
-                    st.success(f"**Mejor di:** {item.get('sugerencia')}")
+    # ==================== CAJA 3: RESULTADOS ====================
+    if st.session_state.sesgos_resultado:
+        with st.container(border=True):
+            st.markdown("#### Informe de Auditoria")
 
-                    # Boton copiar sugerencia
-                    copy_button(item.get('sugerencia', ''), "Copiar", key=f"copy_sug_{i}")
-        else:
-            st.success("Excelente! El texto parece muy objetivo y libre de sesgos evidentes.")
-
-        st.divider()
-
-        # Seccion 3: Version corregida (editable)
-        st.subheader("3. Version Corregida (Neutral)")
-
-        texto_reescrito = datos.get("texto_reescrito", "No se genero texto.")
-
-        texto_final_editado = text_area_with_copy(
-            "Puedes editar antes de copiar o descargar:",
-            texto_reescrito,
-            key="texto_reescrito_edit",
-            height=200
-        )
-
-        st.divider()
-
-        # Seccion 4: Descarga
-        st.subheader("4. Descargar Informe")
-
-        col_name, col_type = st.columns([2, 1])
-        with col_name:
-            nombre_archivo = st.text_input(
-                "Nombre del archivo:",
-                value="Auditoria_Sesgos",
-                help="Sin extension"
+            st.session_state.sesgos_resultado = st.text_area(
+                "Informe editable:",
+                value=st.session_state.sesgos_resultado,
+                height=450,
+                key="edit_sesgos",
+                label_visibility="collapsed"
             )
-        with col_type:
-            tipo_archivo = st.radio("Formato:", ["Word (.docx)", "PDF (.pdf)"], horizontal=True)
 
-        secciones = [
-            ("Texto Original", st.session_state.sesgos_texto_original or ""),
-            ("Analisis de Sesgos", "\n".join([
-                f"- {a.get('tipo_sesgo')}: {a.get('frase_original')}\n  Sugerencia: {a.get('sugerencia')}"
-                for a in alertas
-            ]) if alertas else "Sin sesgos detectados"),
-            ("Version Neutral", texto_final_editado)
-        ]
+        copy_button_component(st.session_state.sesgos_resultado, key="copy_sesgos")
 
-        if tipo_archivo == "Word (.docx)":
-            data = create_word_document("Auditoria de Sesgos Inconscientes", secciones)
-            mime = get_word_mime()
-            ext = "docx"
-        else:
-            data = create_pdf_document("Auditoria de Sesgos Inconscientes", secciones)
-            mime = get_pdf_mime()
-            ext = "pdf"
+        # ==================== CAJA 4: DESCARGA ====================
+        with st.container(border=True):
+            st.markdown("#### Descargar")
 
-        st.download_button(
-            label=f"Descargar {tipo_archivo}",
-            data=data,
-            file_name=f"{nombre_archivo}.{ext}",
-            mime=mime,
-            use_container_width=True
-        )
+            col1, col2 = st.columns(2)
+            with col1:
+                fname = st.text_input(
+                    "Nombre del archivo",
+                    value="Auditoria_Sesgos",
+                    key="eval_fname"
+                )
+            with col2:
+                fmt = st.selectbox(
+                    "Formato",
+                    ["PDF", "Texto (.txt)"],
+                    key="eval_formato"
+                )
 
-    # Historial
-    st.divider()
-    if st.session_state.sesgos_historial:
-        with st.expander("Historial de auditorias (ultimas 5)", expanded=False):
-            for i, item in enumerate(st.session_state.sesgos_historial):
-                st.markdown(f"**{i+1}. Neutralidad: {item['puntaje']}/100**")
-                st.caption(f"Texto: {item['texto']}")
-                if st.button(f"Cargar", key=f"cargar_sesgo_{i}"):
-                    st.session_state.sesgos_resultado = item['resultado']
-                    st.rerun()
-                st.markdown("---")
+            if fmt == "PDF":
+                pdf_data = create_pdf_reportlab(
+                    "Auditoria de Sesgos Inconscientes",
+                    [("Informe", st.session_state.sesgos_resultado)]
+                )
+                st.download_button(
+                    "Descargar PDF",
+                    data=pdf_data,
+                    file_name=f"{fname}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            else:
+                st.download_button(
+                    "Descargar TXT",
+                    data=st.session_state.sesgos_resultado,
+                    file_name=f"{fname}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )

@@ -1,170 +1,187 @@
 """
 Pedidos Impecables - YoCreo Suite
-Basado en la Ontología del Lenguaje (Fernando Flores)
+Protocolo Estandar v2.0
 """
 
 import streamlit as st
+import json
 from datetime import date
+
 from core.config import PRACTICAS
 from core.ai_client import generate_response
-from core.export import create_word_document, create_pdf_document, get_word_mime, get_pdf_mime, text_area_with_copy
+from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
 
 
-def limpiar_texto(texto):
-    """Elimina símbolos markdown del texto"""
-    return texto.replace("*", "").replace("#", "").strip()
+def limpiar_json(texto):
+    """Limpia la respuesta de la IA para obtener JSON valido."""
+    try:
+        texto_limpio = texto.replace("```json", "").replace("```", "").strip()
+        return json.loads(texto_limpio)
+    except:
+        return None
 
 
-def formatear_fecha_es(fecha, hora):
-    """Formatea fecha y hora en español"""
-    dias = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"]
-    meses = ["enero", "febrero", "marzo", "abril", "mayo", "junio",
-             "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"]
-    dia_nombre = dias[fecha.weekday()]
-    mes_nombre = meses[fecha.month - 1]
-    return f"{dia_nombre} {fecha.day} de {mes_nombre} antes de las {hora.strftime('%H:%M')}"
+def generar_pedido_ai(oyente, accion, condiciones, tiempo, trasfondo):
+    """Genera una carta formal con un pedido impecable."""
+    prompt = f"""Actua como un experto en comunicacion corporativa y ontologia del lenguaje.
+Redacta una CARTA FORMAL que constituya un PEDIDO IMPECABLE.
 
+DATOS DEL PEDIDO:
+1. DESTINATARIO: {oyente}
+2. ACCION REQUERIDA: {accion}
+3. CONDICIONES DE SATISFACCION: {condiciones}
+4. FECHA LIMITE: {tiempo}
+5. CONTEXTO/TRASFONDO: {trasfondo}
 
-def generar_pedido_ia(oyente, accion, condiciones, tiempo, contexto):
-    """Genera un pedido impecable con IA"""
-    prompt = f"""
-    Actúa como un Coach Ontológico experto en Fernando Flores.
-    Redacta un "PEDIDO IMPECABLE" basado en:
+INSTRUCCIONES:
+- El texto debe ser solo el cuerpo de la carta/mensaje.
+- Debe ser directo, amable pero firme, y muy claro.
+- Justo antes de la despedida, incluye una frase que busque el COMPROMISO del receptor.
 
-    1. OYENTE: {oyente}
-    2. ACCIÓN: {accion}
-    3. CONDICIONES DE SATISFACCIÓN: {condiciones}
-    4. TIEMPO: {tiempo}
-    5. TRASFONDO: {contexto}
+REGLAS DE FORMATO:
+1. NO uses Markdown (ni negritas **, ni cursivas *).
+2. Texto plano limpio.
 
-    Genera dos partes separadas claramente por la etiqueta "SECCION_ANALISIS":
-
-    Parte 1: El GUION (listo para copiar/pegar, tono profesional y asertivo).
-    Parte 2: SECCION_ANALISIS: Una explicación breve de por qué este pedido reduce incertidumbre.
-    """
-
+Responde EXCLUSIVAMENTE con un JSON valido:
+{{
+    "carta": "Texto completo de la carta..."
+}}"""
     response = generate_response(prompt)
-
     if response:
-        text = response
-        if "SECCION_ANALISIS" in text:
-            parts = text.split("SECCION_ANALISIS")
-            guion = parts[0].replace("SECCION_ANALISIS", "").replace("Parte 1:", "").strip()
-            analisis = parts[1].replace("Parte 2:", "").strip()
-        else:
-            guion = text
-            analisis = "No se generó el análisis detallado."
-
-        return limpiar_texto(guion), limpiar_texto(analisis)
-    return "Error al generar", ""
+        return limpiar_json(response)
+    return None
 
 
 def render():
-    """Renderiza la práctica Pedidos Impecables"""
+    """Renderiza la practica Pedidos Impecables."""
     info = PRACTICAS["pedidos_impecables"]
 
-    # Header
-    st.header(f"{info['icono']} {info['titulo']}")
-    st.write(info['descripcion'])
-    st.write("Completa los 5 componentes de un pedido efectivo para evitar malentendidos.")
-
-    # Inputs
+    # ==================== CAJA 1: ENCABEZADO ====================
     with st.container(border=True):
-        col1, col2, col3 = st.columns([2, 1, 1])
-        with col1:
-            st.markdown("**¿A quién le pides?**")
-            oyente = st.text_input("Oyente", placeholder="Ej: Juan, Jefe de Marketing", label_visibility="collapsed")
-        with col2:
-            st.markdown("**Fecha límite:**")
-            fecha = st.date_input("Fecha límite", min_value=date.today(), label_visibility="collapsed")
-        with col3:
-            st.markdown("**Hora límite:**")
-            hora = st.time_input("Hora límite", label_visibility="collapsed")
+        render_encabezado("pedidos_impecables", info['titulo'], info['descripcion'])
 
-        # Formatear tiempo para el prompt
-        tiempo = formatear_fecha_es(fecha, hora)
+        with st.expander("Ayuda: Los 5 Actos Lingüísticos"):
+            st.write("""
+            Un pedido impecable incluye 5 elementos:
 
-        st.markdown("**Acción (¿Qué necesitas?):**")
-        accion = st.text_area("Acción",
-            placeholder="Ej: Que envíes el reporte de ventas", height=100, label_visibility="collapsed")
-        st.markdown("**Condiciones de Satisfacción (Estándar):**")
-        condiciones = st.text_area("Condiciones",
-            placeholder="Ej: Formato PDF, incluyendo gráficos de Q1", height=100, label_visibility="collapsed")
-        st.markdown("**Trasfondo (¿Para qué?):**")
-        contexto = st.text_area("Trasfondo",
-            placeholder="Ej: Para la reunión de directorio del lunes", height=100, label_visibility="collapsed")
+            1. OYENTE: A quién va dirigido
+            2. ACCION: Qué se solicita específicamente
+            3. CONDICIONES: Cómo debe cumplirse
+            4. TIEMPO: Cuándo debe estar listo
+            5. TRASFONDO: Para qué se necesita
+            """)
 
-    # Estado
+    # Estado de sesion
     if 'pedido_resultado' not in st.session_state:
         st.session_state.pedido_resultado = None
 
-    # Botón
-    if st.button("🚀 GENERAR PEDIDO", type="primary", use_container_width=True):
-        if not oyente or not accion or not tiempo:
-            st.warning("⚠️ Faltan datos clave: Oyente, Acción y Tiempo son obligatorios.")
-        else:
-            with st.spinner("Construyendo acto del habla con IA..."):
-                guion_gen, analisis_gen = generar_pedido_ia(oyente, accion, condiciones, tiempo, contexto)
+    # ==================== CAJA 2: INPUTS ====================
+    with st.container(border=True):
+        st.markdown("#### Datos del Pedido")
 
-                if "Error al generar" in guion_gen:
-                    st.error(guion_gen)
-                else:
-                    st.session_state.pedido_resultado = {
-                        "guion": guion_gen,
-                        "analisis": analisis_gen,
-                        "oyente": oyente
-                    }
-                    st.rerun()
+        col1, col2, col3 = st.columns([2, 1, 1])
+        with col1:
+            oyente_in = st.text_input(
+                "Oyente (Destinatario)",
+                placeholder="Ej: Juan, Jefe de Marketing",
+                key="pedidos_oyente"
+            )
+        with col2:
+            fecha_in = st.date_input(
+                "Fecha Límite",
+                min_value=date.today(),
+                key="pedidos_fecha"
+            )
+        with col3:
+            hora_in = st.time_input(
+                "Hora Límite",
+                key="pedidos_hora"
+            )
 
-    # Resultados
-    if st.session_state.pedido_resultado:
-        res = st.session_state.pedido_resultado
+        tiempo_str = f"{fecha_in.strftime('%d/%m/%Y')} a las {hora_in.strftime('%H:%M')}"
 
-        st.divider()
-        st.subheader("Tu Pedido Listo")
-        st.caption("Puedes editar los textos antes de copiar o descargar")
-
-        guion_edit = text_area_with_copy(
-            "Guion sugerido:",
-            res['guion'],
-            key="pedido_guion_edit",
-            height=200
+        accion_in = st.text_area(
+            "Acción (Qué necesitas)",
+            placeholder="Ej: Enviar el reporte de ventas",
+            height=70,
+            key="pedidos_accion"
         )
 
-        with st.expander("Ver Análisis (Por qué funciona)"):
-            st.write(res['analisis'])
+        condiciones_in = st.text_area(
+            "Condiciones de Satisfacción (Cómo)",
+            placeholder="Ej: En formato Excel, con gráficos comparativos",
+            height=70,
+            key="pedidos_condiciones"
+        )
 
-        st.divider()
+        trasfondo_in = st.text_area(
+            "Trasfondo (Para qué)",
+            placeholder="Ej: Para presentar en la reunión de directorio",
+            height=70,
+            key="pedidos_trasfondo"
+        )
 
-        # Descarga
-        st.subheader("Descargar Pedido")
-        col_d1, col_d2 = st.columns(2)
+        if st.button("Generar Pedido", use_container_width=True):
+            if oyente_in and accion_in:
+                with st.spinner("Redactando carta..."):
+                    data = generar_pedido_ai(oyente_in, accion_in, condiciones_in, tiempo_str, trasfondo_in)
+                    if data and 'carta' in data:
+                        st.session_state.pedido_resultado = data['carta']
+                    else:
+                        st.markdown('<div class="custom-error">No se pudo generar el pedido. Intenta de nuevo.</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="custom-warning">El Oyente y la Accion son obligatorios.</div>', unsafe_allow_html=True)
 
-        with col_d1:
-            st.download_button(
-                label="Descargar Texto (.txt)",
-                data=guion_edit,
-                file_name=f"pedido_{res['oyente']}.txt",
-                mime="text/plain",
-                use_container_width=True
+    # ==================== CAJA 3: RESULTADOS ====================
+    if st.session_state.pedido_resultado:
+        with st.container(border=True):
+            st.markdown("#### Carta Generada")
+
+            st.session_state.pedido_resultado = st.text_area(
+                "Carta editable:",
+                value=st.session_state.pedido_resultado,
+                height=350,
+                key="edit_pedido",
+                label_visibility="collapsed"
             )
 
-        with col_d2:
-            secciones = [
-                ("Guion Sugerido", guion_edit),
-                ("Análisis Ontológico", res['analisis'])
-            ]
-            data = create_word_document("PEDIDO IMPECABLE", secciones)
+        copy_button_component(st.session_state.pedido_resultado, key="copy_pedido")
 
-            st.download_button(
-                label="Descargar Word (.docx)",
-                data=data,
-                file_name=f"pedido_{res['oyente']}.docx",
-                mime=get_word_mime(),
-                use_container_width=True
-            )
+        # ==================== CAJA 4: DESCARGA ====================
+        with st.container(border=True):
+            st.markdown("#### Descargar")
 
-        # Botón reiniciar
-        if st.button("🔄 Hacer Nuevo Pedido", use_container_width=True):
-            st.session_state.pedido_resultado = None
-            st.rerun()
+            col1, col2 = st.columns(2)
+            with col1:
+                fname = st.text_input(
+                    "Nombre del archivo",
+                    value="Solicitud_Formal",
+                    key="pedidos_nombre"
+                )
+            with col2:
+                fmt = st.selectbox(
+                    "Formato",
+                    ["PDF", "Texto (.txt)"],
+                    key="pedidos_formato"
+                )
+
+            if fmt == "PDF":
+                pdf_data = create_pdf_reportlab(
+                    "Solicitud Formal",
+                    [("Carta", st.session_state.pedido_resultado)]
+                )
+                st.download_button(
+                    "Descargar PDF",
+                    data=pdf_data,
+                    file_name=f"{fname}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            else:
+                st.download_button(
+                    "Descargar TXT",
+                    data=st.session_state.pedido_resultado,
+                    file_name=f"{fname}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )

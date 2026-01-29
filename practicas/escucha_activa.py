@@ -1,15 +1,15 @@
 """
 Escucha Activa - YoCreo Suite
-Gimnasio para practicar escucha activa con roleplay interactivo
+Protocolo Estandar v2.0
 """
 
 import streamlit as st
 import json
 import re
-import random
+
 from core.config import PRACTICAS
 from core.ai_client import generate_response
-from core.export import text_area_with_copy
+from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
 
 
 def limpiar_json(texto):
@@ -29,35 +29,16 @@ def limpiar_json(texto):
 
 def generar_personaje():
     """Crea un personaje frustrado aleatorio con alta variabilidad."""
+    prompt = """Genera un caso de roleplay para practicar escucha activa.
 
-    contextos = [
-        "un problema urgente en la oficina que nadie resuelve",
-        "una discusion familiar por dinero",
-        "un reclamo de servicio al cliente por un cobro indebido",
-        "un conflicto con vecinos por ruidos molestos",
-        "estres por sobrecarga de trabajo y falta de reconocimiento",
-        "un error tecnico que borro su trabajo",
-        "una decepcion con un amigo cercano",
-        "un proyecto que se cancelo sin explicacion",
-        "una promesa incumplida por un proveedor"
-    ]
-    contexto_azar = random.choice(contextos)
+IDIOMA: Espanol latinoamericano (sin vosotros, usa tu/usted).
 
-    prompt = f"""Genera un caso breve de roleplay para practicar escucha activa.
-CONTEXTO OBLIGATORIO: {contexto_azar}.
+Inventa un contexto original (laboral, familiar, pareja, salud, economico, etc).
+El personaje debe estar estresado, triste o preocupado.
+Escribe un monologo de 3-5 frases natural y emocional.
 
-El personaje debe estar ESTRESADO, TRISTE o PREOCUPADO.
-Escribe un monologo (3 a 5 frases) donde mezcle hechos con emociones intensas.
-El texto debe ser desordenado y natural, como habla la gente real cuando se desahoga.
-
-Responde SOLO JSON con esta estructura:
-{{
-    "nombre": "Nombre del personaje",
-    "rol": "Ej: Cliente, Hijo, Jefe, Vecino",
-    "emocion_dominante": "La emocion principal oculta",
-    "texto_monologo": "Lo que dice el personaje..."
-}}"""
-
+Responde SOLO con este JSON (sin texto adicional):
+{"nombre": "Nombre", "rol": "Rol", "emocion_dominante": "Emocion", "texto_monologo": "El monologo aqui..."}"""
     response = generate_response(prompt)
     if response:
         return limpiar_json(response)
@@ -65,8 +46,7 @@ Responde SOLO JSON con esta estructura:
 
 
 def evaluar_respuesta(caso_original, respuesta_usuario):
-    """Evalua si el usuario escucho o si dio consejos (lo cual esta prohibido)."""
-
+    """Evalua si el usuario escucho o si dio consejos."""
     prompt = f"""Actua como Supervisor de Coaching. Evalua la respuesta del usuario ante una queja.
 
 CASO ORIGINAL (Dijo el personaje): "{caso_original}"
@@ -77,15 +57,18 @@ CRITERIOS DE EVALUACION:
 2. VALIDACION: El usuario reconocio la emocion explicita o implicita?
 3. PARAFRASEO: El usuario resumio los hechos principales sin agregar de su cosecha?
 
-Responde SOLO JSON:
+REGLAS DE FORMATO:
+1. NO uses Markdown (ni negritas **, ni cursivas *).
+2. Texto plano limpio.
+
+Responde EXCLUSIVAMENTE con un JSON valido:
 {{
     "consejo_detectado": true/false,
     "puntaje": (Numero del 1 al 10),
-    "feedback_positivo": "Breve: Lo que hizo bien...",
-    "feedback_mejora": "Breve: Lo que le falto...",
-    "ejemplo_ideal": "Escribe un ejemplo de como hubiese sido una respuesta perfecta (Reflective Listening)"
+    "feedback_positivo": "Lo que hizo bien...",
+    "feedback_mejora": "Lo que le falto...",
+    "ejemplo_ideal": "Respuesta perfecta de Reflective Listening"
 }}"""
-
     response = generate_response(prompt)
     if response:
         return limpiar_json(response)
@@ -93,128 +76,122 @@ Responde SOLO JSON:
 
 
 def render():
-    """Renderiza la practica Escucha Activa"""
+    """Renderiza la practica Escucha Activa."""
     info = PRACTICAS["escucha_activa"]
 
-    # Header
-    st.header(f"{info['icono']} {info['titulo']}")
-    st.write(info['descripcion'])
+    # ==================== CAJA 1: ENCABEZADO ====================
+    with st.container(border=True):
+        render_encabezado("escucha_activa", info['titulo'], info['descripcion'])
 
-    with st.expander("Regla de Oro de la Escucha Activa"):
-        st.warning("""
-        **NO des consejos ni soluciones.**
-        Solo escucha, valida la emocion y resume lo que entendiste.
+        with st.expander("Ayuda: Regla de Oro"):
+            st.write("""
+            NO des consejos ni soluciones.
+            Solo escucha, valida la emocion y resume lo que entendiste.
 
-        Evita frases como:
-        - "Deberias..."
-        - "Por que no pruebas..."
-        - "Yo en tu lugar..."
-        """)
+            Evita frases como:
+            - "Deberias..."
+            - "Por que no pruebas..."
+            - "Yo en tu lugar..."
+            """)
 
     # Estado de sesion
-    if 'escucha_caso_actual' not in st.session_state:
-        st.session_state.escucha_caso_actual = None
+    if 'escucha_caso' not in st.session_state:
+        st.session_state.escucha_caso = None
     if 'escucha_evaluacion' not in st.session_state:
         st.session_state.escucha_evaluacion = None
     if 'escucha_historial' not in st.session_state:
         st.session_state.escucha_historial = []
 
-    # Boton para generar caso
-    if st.button("Traer un nuevo interlocutor", type="primary", use_container_width=True):
-        with st.spinner("Buscando a alguien que necesita ser escuchado..."):
-            st.session_state.escucha_caso_actual = generar_personaje()
-            st.session_state.escucha_evaluacion = None
+    # ==================== CAJA 2: SIMULADOR ====================
+    with st.container(border=True):
+        st.markdown("#### Simulador de Escucha")
 
-    # Mostrar el caso si existe
-    if st.session_state.escucha_caso_actual:
-        caso = st.session_state.escucha_caso_actual
+        if st.button("Traer nuevo interlocutor", use_container_width=True):
+            with st.spinner("Buscando a alguien que necesita ser escuchado..."):
+                resultado = generar_personaje()
+                if resultado:
+                    st.session_state.escucha_caso = resultado
+                    st.session_state.escucha_evaluacion = None
+                    st.rerun()
+                else:
+                    st.markdown('<div class="custom-error">No se pudo generar el personaje. Intenta de nuevo.</div>', unsafe_allow_html=True)
 
-        st.markdown(f"### {caso.get('nombre', 'Persona')} ({caso.get('rol', 'Desconocido')}) te dice:")
+        if st.session_state.escucha_caso:
+            caso = st.session_state.escucha_caso
+            st.markdown(f"**{caso.get('nombre', 'Persona')} ({caso.get('rol', 'Desconocido')}) te dice:**")
 
-        # Cuadro de dialogo destacado
-        monologo = caso.get('texto_monologo', '')
-        st.info(f'"{monologo}"')
+            monologo = caso.get('texto_monologo', '')
+            st.text_area(
+                "Monologo:",
+                value=f'"{monologo}"',
+                height=100,
+                disabled=True,
+                label_visibility="collapsed"
+            )
 
-        st.write("**Tu mision:** Demuestrale que le entendiste. NO soluciones su problema.")
+            st.write("Tu mision: Demuestrale que le entendiste. NO soluciones su problema.")
 
-        # Input del usuario con icono de copiar
-        respuesta_user = text_area_with_copy(
-            "Tu respuesta (Escribe lo que le dirias):",
-            "",
-            key="respuesta_escucha",
-            height=100
-        )
+            respuesta_user = st.text_area(
+                "Tu respuesta (Escribe lo que le dirias):",
+                placeholder="Escribe aqui tu respuesta de escucha activa...",
+                height=100,
+                key="respuesta_escucha"
+            )
 
-        # Boton evaluar
-        if st.button("Evaluar mi Escucha", type="secondary", use_container_width=True):
-            if len(respuesta_user) < 5:
-                st.warning("Escribe una respuesta mas completa antes de evaluar.")
-            else:
-                with st.spinner("El Supervisor esta analizando tu empatia..."):
-                    evaluacion = evaluar_respuesta(monologo, respuesta_user)
-                    st.session_state.escucha_evaluacion = evaluacion
+            if st.button("Evaluar mi Escucha", use_container_width=True):
+                if len(respuesta_user) < 5:
+                    st.markdown('<div class="custom-warning">Escribe una respuesta mas completa antes de evaluar.</div>', unsafe_allow_html=True)
+                else:
+                    with st.spinner("Analizando tu empatia..."):
+                        evaluacion = evaluar_respuesta(monologo, respuesta_user)
+                        st.session_state.escucha_evaluacion = evaluacion
 
-                    # Guardar en historial
-                    if evaluacion:
-                        st.session_state.escucha_historial.insert(0, {
-                            "personaje": caso.get('nombre', 'Persona'),
-                            "monologo": monologo[:50] + "...",
-                            "respuesta": respuesta_user,
-                            "puntaje": evaluacion.get('puntaje', 0)
-                        })
-                        st.session_state.escucha_historial = st.session_state.escucha_historial[:5]
+                        if evaluacion:
+                            st.session_state.escucha_historial.insert(0, {
+                                "personaje": caso.get('nombre', 'Persona'),
+                                "monologo": monologo[:50] + "...",
+                                "puntaje": evaluacion.get('puntaje', 0)
+                            })
+                            st.session_state.escucha_historial = st.session_state.escucha_historial[:5]
+        else:
+            st.write("Presiona el boton para comenzar el simulacro.")
 
-    # Mostrar resultados de evaluacion
+    # ==================== CAJA 3: RESULTADOS ====================
     if st.session_state.escucha_evaluacion:
         ev = st.session_state.escucha_evaluacion
 
-        st.divider()
-        st.subheader("Veredicto del Coach")
+        with st.container(border=True):
+            st.markdown("#### Veredicto del Coach")
 
-        score = ev.get('puntaje', 0)
+            score = ev.get('puntaje', 0)
 
-        if ev.get('consejo_detectado'):
-            st.error("ALERTA DE SOLUCIONITIS!")
-            st.markdown("**Error fatal:** Intentaste arreglar el problema o dar un consejo. En la escucha activa pura, primero debemos validar.")
-        elif score >= 8:
-            st.balloons()
-            st.success(f"Excelente Escucha! Nota: {score}/10")
-        elif score >= 5:
-            st.warning(f"Escucha aceptable. Nota: {score}/10")
-        else:
-            st.error(f"No te sintieron presente. Nota: {score}/10")
+            if ev.get('consejo_detectado'):
+                st.markdown('<div class="custom-error">ALERTA: Intentaste dar un consejo. En la escucha activa pura, primero debemos validar.</div>', unsafe_allow_html=True)
 
-        # Columnas de Feedback
-        c1, c2 = st.columns(2)
-        with c1:
-            st.markdown("**Lo bueno:**")
-            st.write(ev.get('feedback_positivo', ''))
-        with c2:
-            st.markdown("**A corregir:**")
-            st.write(ev.get('feedback_mejora', ''))
+            resultado_texto = f"""PUNTAJE: {score}/10
 
-        st.markdown("---")
+LO BUENO:
+{ev.get('feedback_positivo', '')}
 
-        # Ejemplo ideal (editable con icono copiar)
-        st.markdown("**Respuesta Ideal (Ejemplo):**")
-        ejemplo = ev.get('ejemplo_ideal', '')
+A MEJORAR:
+{ev.get('feedback_mejora', '')}
 
-        ejemplo_editado = text_area_with_copy(
-            "Puedes editar y copiar:",
-            ejemplo,
-            key="ejemplo_ideal_edit",
-            height=100
-        )
+RESPUESTA IDEAL:
+{ev.get('ejemplo_ideal', '')}"""
 
-    # Pie de pagina
-    if not st.session_state.escucha_caso_actual:
-        st.info("Presiona el boton para comenzar el simulacro.")
+            st.session_state.escucha_resultado_texto = st.text_area(
+                "Evaluacion editable:",
+                value=resultado_texto,
+                height=300,
+                key="edit_escucha",
+                label_visibility="collapsed"
+            )
 
-    # Historial
-    st.divider()
+        copy_button_component(st.session_state.escucha_resultado_texto, key="copy_escucha")
+
+    # ==================== HISTORIAL ====================
     if st.session_state.escucha_historial:
-        with st.expander("Historial de practicas (ultimas 5)", expanded=False):
+        with st.expander("Historial de practicas (ultimas 5)"):
             for i, item in enumerate(st.session_state.escucha_historial):
-                st.markdown(f"**{i+1}. {item['personaje']}** - Puntaje: {item['puntaje']}/10")
+                st.write(f"{i+1}. {item['personaje']} - Puntaje: {item['puntaje']}/10")
                 st.caption(f"Caso: {item['monologo']}")
-                st.markdown("---")

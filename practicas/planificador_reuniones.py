@@ -1,169 +1,165 @@
 """
 Planificador de Reuniones - YoCreo Suite
-Diseña agendas efectivas con IA
+Protocolo Estandar v2.0
 """
 
 import streamlit as st
 import json
-import re
+from io import BytesIO
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+
 from core.config import PRACTICAS
 from core.ai_client import generate_response
-from core.export import (
-    create_word_document, create_pdf_document, create_excel_document,
-    get_word_mime, get_pdf_mime, get_excel_mime, copy_button
-)
+from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
 
 
-def generar_planificacion(tema, objetivo, duracion):
-    """Genera planificación de reunión en formato JSON"""
-    prompt = f"""
-    Actúa como un Facilitador Experto. Diseña una agenda para una reunión de {duracion} minutos.
-    TEMA: {tema} | OBJETIVO: {objetivo}
-
-    Responde EXCLUSIVAMENTE con un JSON válido.
-    NO utilices bloques de código markdown (```json). Entrega solo el JSON crudo.
-
-    Estructura obligatoria:
-    {{
-        "agenda": [
-            {{"minutos": "00-05", "actividad": "...", "responsable": "..."}},
-            {{"minutos": "...", "actividad": "...", "responsable": "..."}}
-        ],
-        "consejos": "Consejo 1... Consejo 2..."
-    }}
-    """
-    return generate_response(prompt)
-
-
-def procesar_respuesta(texto_completo):
-    """Extrae JSON válido de la respuesta"""
+def limpiar_json(texto):
+    """Limpia la respuesta de la IA para obtener JSON valido."""
     try:
-        texto_limpio = texto_completo.replace("```json", "").replace("```", "").strip()
+        texto_limpio = texto.replace("```json", "").replace("```", "").strip()
+        return json.loads(texto_limpio)
+    except:
+        return None
 
-        try:
-            datos = json.loads(texto_limpio)
-            return datos["agenda"], datos["consejos"]
-        except json.JSONDecodeError:
-            match = re.search(r'(\{.*\}|\[.*\])', texto_completo, re.DOTALL)
-            if match:
-                json_str = match.group(0)
-                datos = json.loads(json_str)
-                return datos["agenda"], datos["consejos"]
-            else:
-                return None, "No se encontró un JSON válido en la respuesta."
 
-    except Exception as e:
-        return None, f"Error al procesar datos: {str(e)}"
+def generar_planificacion_ai(tema, objetivo, duracion):
+    """Genera agenda de reunion estructurada."""
+    prompt = f"""Actua como un Facilitador Experto. Disena una agenda para una reunion de {duracion} minutos.
+TEMA: {tema}
+OBJETIVO: {objetivo}
+
+REGLAS DE FORMATO:
+1. NO uses Markdown (ni negritas **, ni cursivas *).
+2. Texto plano limpio.
+
+Responde EXCLUSIVAMENTE con un JSON valido:
+{{
+    "agenda": [
+        {{"minutos": "00-05", "actividad": "Inicio y contexto", "responsable": "Lider"}},
+        {{"minutos": "05-15", "actividad": "...", "responsable": "..."}}
+    ],
+    "consejos": "Consejo 1. Consejo 2."
+}}"""
+    response = generate_response(prompt)
+    if response:
+        return limpiar_json(response)
+    return None
 
 
 def render():
-    """Renderiza la práctica Planificador de Reuniones"""
+    """Renderiza la practica Planificador de Reuniones."""
     info = PRACTICAS["planificador_reuniones"]
 
-    # Header
-    st.header(f"{info['icono']} {info['titulo']}")
-    st.write(info['descripcion'])
-
-    # Inputs
+    # ==================== CAJA 1: ENCABEZADO ====================
     with st.container(border=True):
-        col1, col2 = st.columns([2, 1])
-        with col1:
-            st.markdown("**Tema:**")
-            tema_input = st.text_input("Tema:", placeholder="Ej: Planificación Q1", label_visibility="collapsed")
-            st.markdown("**Objetivo:**")
-            obj_input = st.text_input("Objetivo:", placeholder="Ej: Aprobar presupuesto", label_visibility="collapsed")
-        with col2:
-            st.markdown("**Duración:**")
-            duracion_input = st.selectbox("Minutos:", [15, 30, 45, 60], index=1, label_visibility="collapsed")
+        render_encabezado("planificador_reuniones", info['titulo'], info['descripcion'])
 
-    # Estado
-    if 'reunion_agenda' not in st.session_state:
-        st.session_state.reunion_agenda = None
-        st.session_state.reunion_consejos = None
+        with st.expander("Ayuda: Reuniones Efectivas"):
+            st.write("""
+            Una reunion efectiva tiene:
 
-    # Botón
-    if st.button("⚡ Generar Planificación", type="primary", use_container_width=True):
-        if not tema_input or not obj_input:
-            st.warning("⚠️ Completa los campos.")
-        else:
-            with st.spinner("Creando estrategia..."):
-                texto_raw = generar_planificacion(tema_input, obj_input, duracion_input)
-                agenda_data, consejos_data = procesar_respuesta(texto_raw)
+            1. Objetivo claro definido
+            2. Agenda con tiempos asignados
+            3. Responsables por cada punto
+            4. Acuerdos y proximos pasos
+            """)
 
-                if agenda_data:
-                    st.session_state.reunion_agenda = agenda_data
-                    st.session_state.reunion_consejos = consejos_data
-                    st.session_state.reunion_tema = tema_input
-                    st.session_state.reunion_objetivo = obj_input
-                else:
-                    st.error(consejos_data)
+    # Estado de sesion
+    if 'agenda_resultado' not in st.session_state:
+        st.session_state.agenda_resultado = None
 
-    # Resultados
-    if st.session_state.reunion_agenda:
-        st.subheader("Tu Agenda")
+    # ==================== CAJA 2: INPUTS ====================
+    with st.container(border=True):
+        st.markdown("#### Datos de la Reunion")
 
-        # Mostrar tabla
-        st.table(st.session_state.reunion_agenda)
-
-        # Preparar texto para copiar
-        agenda_copy = "\n".join([
-            f"{item['minutos']}: {item['actividad']} ({item['responsable']})"
-            for item in st.session_state.reunion_agenda
-        ])
-
-        col_info, col_copy = st.columns([5, 1])
-        with col_info:
-            st.info(f"**Tips:** {st.session_state.reunion_consejos}")
-        with col_copy:
-            copy_button(agenda_copy, "Copiar", key="copy_agenda")
-
-        st.divider()
-
-        # Descarga
-        st.subheader("📥 Descargar Archivo")
-
-        c_nombre, c_tipo = st.columns([2, 1])
-        with c_nombre:
-            nombre_archivo = st.text_input("Nombre del archivo:", value="Agenda_Reunion")
-        with c_tipo:
-            tipo_archivo = st.radio("Formato:", ["Word", "PDF", "Excel"], horizontal=True)
-
-        tema = st.session_state.get('reunion_tema', tema_input)
-        objetivo = st.session_state.get('reunion_objetivo', obj_input)
-        agenda = st.session_state.reunion_agenda
-        consejos = st.session_state.reunion_consejos
-
-        if tipo_archivo == "Word":
-            agenda_text = "\n".join([f"- {item['minutos']}: {item['actividad']} ({item['responsable']})" for item in agenda])
-            secciones = [
-                ("Tema", tema),
-                ("Objetivo", objetivo),
-                ("Agenda", agenda_text),
-                ("Consejos", consejos)
-            ]
-            data = create_word_document("Plan de Reunión", secciones)
-            mime = get_word_mime()
-            ext = "docx"
-        elif tipo_archivo == "PDF":
-            agenda_text = "\n".join([f"- {item['minutos']}: {item['actividad']} ({item['responsable']})" for item in agenda])
-            secciones = [
-                ("Tema", tema),
-                ("Objetivo", objetivo),
-                ("Agenda", agenda_text),
-                ("Consejos", consejos)
-            ]
-            data = create_pdf_document("Plan de Reunión", secciones)
-            mime = get_pdf_mime()
-            ext = "pdf"
-        else:  # Excel
-            data = create_excel_document(agenda, "Agenda")
-            mime = get_excel_mime()
-            ext = "xlsx"
-
-        st.download_button(
-            label=f"💾 Descargar en {tipo_archivo}",
-            data=data,
-            file_name=f"{nombre_archivo}.{ext}",
-            mime=mime,
-            use_container_width=True
+        tema_input = st.text_input(
+            "Tema",
+            placeholder="Ej: Planificacion Q3",
+            key="plan_tema"
         )
+
+        obj_input = st.text_input(
+            "Objetivo",
+            placeholder="Ej: Asignar presupuesto por area",
+            key="plan_objetivo"
+        )
+
+        duracion_input = st.selectbox(
+            "Duracion",
+            [15, 30, 45, 60, 90],
+            index=3,
+            format_func=lambda x: f"{x} minutos",
+            key="plan_duracion"
+        )
+
+        if st.button("Generar Agenda", use_container_width=True):
+            if tema_input and obj_input:
+                with st.spinner("Disenando agenda..."):
+                    data = generar_planificacion_ai(tema_input, obj_input, duracion_input)
+                    if data:
+                        txt = f"TEMA: {tema_input}\nOBJETIVO: {obj_input}\nDURACION: {duracion_input} minutos\n\nAGENDA:\n"
+                        for item in data['agenda']:
+                            txt += f"- {item['minutos']} min: {item['actividad']} ({item['responsable']})\n"
+                        txt += f"\nCONSEJOS:\n{data.get('consejos', '')}"
+                        st.session_state.agenda_resultado = txt
+                    else:
+                        st.markdown('<div class="custom-error">No se pudo generar la agenda. Intenta de nuevo.</div>', unsafe_allow_html=True)
+            else:
+                st.markdown('<div class="custom-warning">Completa el tema y objetivo.</div>', unsafe_allow_html=True)
+
+    # ==================== CAJA 3: RESULTADOS ====================
+    if st.session_state.agenda_resultado:
+        with st.container(border=True):
+            st.markdown("#### Agenda Generada")
+
+            st.session_state.agenda_resultado = st.text_area(
+                "Agenda editable:",
+                value=st.session_state.agenda_resultado,
+                height=350,
+                key="edit_agenda",
+                label_visibility="collapsed"
+            )
+
+        copy_button_component(st.session_state.agenda_resultado, key="copy_agenda")
+
+        # ==================== CAJA 4: DESCARGA ====================
+        with st.container(border=True):
+            st.markdown("#### Descargar")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                fname = st.text_input(
+                    "Nombre del archivo",
+                    value="Agenda_Reunion",
+                    key="plan_fname"
+                )
+            with col2:
+                fmt = st.selectbox(
+                    "Formato",
+                    ["PDF", "Texto (.txt)"],
+                    key="plan_formato"
+                )
+
+            if fmt == "PDF":
+                pdf_data = create_pdf_reportlab(
+                    "Plan de Reunion",
+                    [("Agenda", st.session_state.agenda_resultado)]
+                )
+                st.download_button(
+                    "Descargar PDF",
+                    data=pdf_data,
+                    file_name=f"{fname}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            else:
+                st.download_button(
+                    "Descargar TXT",
+                    data=st.session_state.agenda_resultado,
+                    file_name=f"{fname}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )

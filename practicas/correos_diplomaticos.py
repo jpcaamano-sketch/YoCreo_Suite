@@ -1,217 +1,181 @@
 """
-Correo Diplomático - YoCreo Suite
-Convierte borradores difíciles en comunicación efectiva
+Correos Diplomaticos - YoCreo Suite
+Protocolo Estandar v2.0
 """
 
 import streamlit as st
+import json
+
 from core.config import PRACTICAS
 from core.ai_client import generate_response
-from core.export import create_word_document, create_pdf_document, get_word_mime, get_pdf_mime, text_area_with_copy
+from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
 
 
-def generar_opciones(texto, destinatario, tono):
-    """Genera 3 versiones del mensaje con IA"""
-    separador = "|||"
+def limpiar_json(texto):
+    """Limpia la respuesta de la IA para obtener JSON valido."""
+    try:
+        texto_limpio = texto.replace("```json", "").replace("```", "").strip()
+        return json.loads(texto_limpio)
+    except:
+        return None
 
-    tonos_desc = {
-        "Neutro": "equilibrado y objetivo",
-        "Cordial": "amable y cálido",
-        "Urgente": "con sentido de prioridad y acción inmediata",
-        "Empático": "comprensivo y considerado con los sentimientos del otro"
-    }
-    tono_descripcion = tonos_desc.get(tono, "equilibrado")
 
+def generar_correos_ai(texto, destinatario, tono):
+    """Genera 3 versiones de un mensaje diplomático."""
     prompt = f"""Eres un experto en comunicación asertiva y redacción profesional.
 
-MENSAJE ORIGINAL A TRANSFORMAR:
-\"\"\"
-{texto}
-\"\"\"
-
-CONTEXTO:
-- Destinatario: {destinatario}
-- Tono requerido: {tono} ({tono_descripcion})
+MENSAJE ORIGINAL: "{texto}"
+DESTINATARIO: {destinatario}
+TONO DESEADO: {tono}
 
 TU TAREA:
-Reescribe el mensaje completo transformándolo en comunicación asertiva y diplomática.
-- MANTÉN todos los puntos y argumentos del mensaje original
-- ELIMINA el tono agresivo, sarcasmo, ataques personales y lenguaje pasivo-agresivo
-- CONSERVA la esencia y los pedidos/solicitudes del mensaje
-- El resultado debe ser un correo COMPLETO, listo para enviar, con saludo y despedida
+Genera 3 versiones del correo (Profesional, Directa, Coloquial) transformando el mensaje original en comunicacion asertiva.
 
-IMPORTANTE: Cada versión debe ser un correo COMPLETO de longitud similar al original, NO un resumen.
+REGLAS DE FORMATO:
+1. NO uses Markdown (ni negritas **, ni cursivas *).
+2. Texto plano limpio.
+3. El resultado debe ser un correo completo (Asunto, Cuerpo, Despedida).
 
-REGLAS DE FORMATO ESTRICTAS:
-- NO escribas introducciones como "Aquí tienes...", "A continuación...", "Estas son..."
-- NO escribas explicaciones ni comentarios
-- SOLO escribe los correos directamente
-- Comienza DIRECTAMENTE con "Versión Profesional:" sin ningún texto previo
-
-Genera exactamente 3 versiones. Usa el separador "{separador}" entre cada una:
-
-Versión Profesional:
-[Correo completo en tono formal y corporativo]
-{separador}
-Versión Directa:
-[Correo completo en tono ejecutivo y al grano, pero respetuoso]
-{separador}
-Versión Coloquial:
-[Correo completo en tono cercano y amigable, pero profesional]"""
-
+Responde EXCLUSIVAMENTE con un JSON valido:
+{{
+    "profesional": "Texto completo version formal...",
+    "directa": "Texto completo version ejecutiva...",
+    "coloquial": "Texto completo version cercana..."
+}}"""
     response = generate_response(prompt)
-
     if response:
-        partes = response.replace("*", "").split(separador)
-        return {
-            "profesional": partes[0].replace("Versión Profesional:", "").strip() if len(partes) > 0 else "Error",
-            "directo": partes[1].replace("Versión Directa:", "").strip() if len(partes) > 1 else "Error",
-            "coloquial": partes[2].replace("Versión Coloquial:", "").strip() if len(partes) > 2 else "Error"
-        }
-    return {"error": "No se pudo generar respuesta"}
+        data = limpiar_json(response)
+        if data:
+            for key in data:
+                data[key] = data[key].replace("**", "").replace("##", "")
+            return data
+    return None
 
 
 def render():
-    """Renderiza la práctica Correo Diplomático"""
+    """Renderiza la practica Correos Diplomaticos."""
     info = PRACTICAS["correos_diplomaticos"]
 
-    # Header
-    st.header(f"{info['icono']} {info['titulo']}")
-    st.write(info['descripcion'])
-
-    # Inputs
+    # ==================== CAJA 1: ENCABEZADO ====================
     with st.container(border=True):
-        st.markdown("**¿A quién le escribes?**")
-        destinatario = st.selectbox(
-            "Destinatario",
-            ["Cliente", "Jefe/Superior", "Colaborador/Equipo", "Proveedor",
-             "Par (Colega/Igual)", "Recursos Humanos", "Cliente Interno", "Comité/Directorio"],
-            label_visibility="collapsed"
-        )
+        render_encabezado("correos_diplomaticos", info['titulo'], info['descripcion'])
 
-        st.markdown("**¿Qué tono prefieres?**")
-        tono = st.selectbox(
-            "Tono",
-            ["Neutro", "Cordial", "Urgente", "Empático"],
-            help="Neutro: equilibrado | Cordial: amable | Urgente: con prioridad | Empático: comprensivo",
-            label_visibility="collapsed"
-        )
+        with st.expander("Ayuda: Como funciona"):
+            st.write("""
+            Esta herramienta reescribe tus borradores eliminando la agresividad o la pasividad, y te propone 3 posibles respuestas:
 
-        st.markdown("**Borrador del texto (sin filtro):**")
+            - Profesional: Formal y estructurado
+            - Directo: Ejecutivo y al punto
+            - Coloquial: Cercano y amigable
+            """)
+
+    # Estado de sesion
+    if 'mail_resultado' not in st.session_state:
+        st.session_state.mail_resultado = None
+    if 'mail_versions' not in st.session_state:
+        st.session_state.mail_versions = None
+    if 'mail_original' not in st.session_state:
+        st.session_state.mail_original = None
+
+    # ==================== CAJA 2: INPUTS ====================
+    with st.container(border=True):
+        st.markdown("#### Tu Borrador")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            destinatario = st.selectbox(
+                "Destinatario",
+                ["Cliente", "Jefe/Superior",  "Par (Colega)", "Colaborador/Equipo", "Proveedor","RRHH", "Comité"],
+                key="correos_destinatario"
+            )
+        with col2:
+            tono = st.selectbox(
+                "Tono Principal",
+                ["Neutro", "Cordial", "Urgente", "Empático"],
+                key="correos_tono"
+            )
+
         texto_input = st.text_area(
-            "Borrador",
-            height=120,
+            "Borrador del texto (sin filtro)",
             placeholder="Ej: Necesito que me entregues eso ahora mismo o tendremos problemas...",
-            label_visibility="collapsed"
+            height=100,
+            key="correos_texto"
         )
 
-    # Estado de sesión
-    if 'correos_resultado' not in st.session_state:
-        st.session_state.correos_resultado = None
-    if 'correos_historial' not in st.session_state:
-        st.session_state.correos_historial = []
+        if st.button("Generar Propuestas", use_container_width=True):
+            if texto_input:
+                with st.spinner("Reescribiendo mensajes..."):
+                    data = generar_correos_ai(texto_input, destinatario, tono)
+                    if data:
+                        st.session_state.mail_versions = data
+                        st.session_state.mail_original = texto_input
+                        resultado = f"""ORIGINAL:
+{texto_input}
 
-    # Botón de acción
-    if st.button("✨ Generar Propuestas", type="primary", use_container_width=True):
-        if not texto_input:
-            st.warning("Escribe un borrador primero.")
-        else:
-            with st.spinner("Analizando tono y reescribiendo..."):
-                st.session_state.correos_resultado = generar_opciones(texto_input, destinatario, tono)
-                st.session_state.correos_texto_original = texto_input
+--- VERSION PROFESIONAL ---
+{data['profesional']}
 
-                # Guardar en historial
-                st.session_state.correos_historial.insert(0, {
-                    "original": texto_input,
-                    "destinatario": destinatario,
-                    "tono": tono,
-                    "resultado": st.session_state.correos_resultado
-                })
-                st.session_state.correos_historial = st.session_state.correos_historial[:5]
+--- VERSION DIRECTA ---
+{data['directa']}
 
-    # Resultados
-    if st.session_state.correos_resultado:
-        res = st.session_state.correos_resultado
-
-        if "error" in res:
-            st.error(f"Error técnico: {res['error']}")
-        else:
-            st.markdown("### Opciones Asertivas")
-            st.caption("Puedes editar los textos antes de copiar o descargar")
-
-            version_profesional = text_area_with_copy(
-                "Profesional (Formal):",
-                res.get('profesional', ''),
-                key="edit_profesional",
-                height=150
-            )
-
-            version_directa = text_area_with_copy(
-                "Directo (Ejecutivo):",
-                res.get('directo', ''),
-                key="edit_directo",
-                height=150
-            )
-
-            version_coloquial = text_area_with_copy(
-                "Coloquial (Cercano):",
-                res.get('coloquial', ''),
-                key="edit_coloquial",
-                height=150
-            )
-
-            res_editado = {
-                "profesional": version_profesional,
-                "directo": version_directa,
-                "coloquial": version_coloquial
-            }
-
-            st.divider()
-
-            # Zona de descarga
-            st.subheader("📥 Descargar Archivo")
-
-            col_name, col_type = st.columns([2, 1])
-            with col_name:
-                nombre_archivo = st.text_input("Nombre del archivo:", value="Mis_Propuestas", help="Sin extensión")
-            with col_type:
-                tipo_archivo = st.radio("Formato:", ["Word (.docx)", "PDF (.pdf)"], horizontal=True)
-
-            texto_orig = st.session_state.get('correos_texto_original', texto_input)
-
-            secciones = [
-                ("Original", texto_orig),
-                ("1. Profesional", res_editado['profesional']),
-                ("2. Directo", res_editado['directo']),
-                ("3. Coloquial", res_editado['coloquial'])
-            ]
-
-            if tipo_archivo == "Word (.docx)":
-                data = create_word_document("Propuestas de Comunicación", secciones)
-                mime = get_word_mime()
-                ext = "docx"
+--- VERSION COLOQUIAL ---
+{data['coloquial']}"""
+                        st.session_state.mail_resultado = resultado
+                    else:
+                        st.markdown('<div class="custom-error">No se pudieron generar las propuestas. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:
-                data = create_pdf_document("Propuestas de Comunicación", secciones)
-                mime = get_pdf_mime()
-                ext = "pdf"
+                st.markdown('<div class="custom-warning">Por favor escribe un borrador primero.</div>', unsafe_allow_html=True)
 
-            st.download_button(
-                label=f"💾 Descargar {tipo_archivo}",
-                data=data,
-                file_name=f"{nombre_archivo}.{ext}",
-                mime=mime,
-                use_container_width=True
+    # ==================== CAJA 3: RESULTADOS ====================
+    if st.session_state.mail_resultado:
+        with st.container(border=True):
+            st.markdown("#### Propuestas Generadas")
+
+            st.session_state.mail_resultado = st.text_area(
+                "Propuestas editables:",
+                value=st.session_state.mail_resultado,
+                height=400,
+                key="edit_mail",
+                label_visibility="collapsed"
             )
 
-    # Historial
-    st.divider()
-    if st.session_state.correos_historial:
-        with st.expander("📜 Historial de conversiones (últimas 5)", expanded=False):
-            for i, item in enumerate(st.session_state.correos_historial):
-                st.markdown(f"**{i+1}. Para: {item['destinatario']} | Tono: {item['tono']}**")
-                orig = item['original']
-                st.caption(f"Original: {orig[:100]}..." if len(orig) > 100 else f"Original: {orig}")
-                if st.button(f"Cargar esta conversión", key=f"cargar_correos_{i}"):
-                    st.session_state.correos_resultado = item['resultado']
-                    st.session_state.correos_texto_original = item['original']
-                    st.rerun()
-                st.markdown("---")
+        copy_button_component(st.session_state.mail_resultado, key="copy_mail")
+
+        # ==================== CAJA 4: DESCARGA ====================
+        with st.container(border=True):
+            st.markdown("#### Descargar")
+
+            col1, col2 = st.columns(2)
+            with col1:
+                fname = st.text_input(
+                    "Nombre del archivo",
+                    value="Propuestas_Mensaje",
+                    key="correos_nombre"
+                )
+            with col2:
+                fmt = st.selectbox(
+                    "Formato",
+                    ["PDF", "Texto (.txt)"],
+                    key="correos_formato"
+                )
+
+            if fmt == "PDF":
+                pdf_data = create_pdf_reportlab(
+                    "Propuestas de Comunicacion",
+                    [("Resultado", st.session_state.mail_resultado)]
+                )
+                st.download_button(
+                    "Descargar PDF",
+                    data=pdf_data,
+                    file_name=f"{fname}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            else:
+                st.download_button(
+                    "Descargar TXT",
+                    data=st.session_state.mail_resultado,
+                    file_name=f"{fname}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
