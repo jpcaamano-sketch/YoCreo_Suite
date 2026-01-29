@@ -4,3 +4,7 @@ fpdf
 python-docx
 pandas
 openpyxl
+bcrypt
+stripe
+reportlab
+supabase
