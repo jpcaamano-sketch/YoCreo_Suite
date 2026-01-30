@@ -37,11 +37,11 @@ def render_encabezado(practica_key, titulo, descripcion):
     tiene_manual = os.path.exists(pdf_path)
 
     if tiene_manual:
-        col1, col2 = st.columns([0.92, 0.08])
+        col1, col2 = st.columns([0.85, 0.15])
         with col1:
             st.markdown(f"### {titulo}")
         with col2:
-            if st.button("?", key=f"manual_btn_{practica_key}", help=f"Ver Manual de {titulo}"):
+            if st.button("📖", key=f"manual_btn_{practica_key}", help=f"Ver Manual de {titulo}"):
                 # Abrir PDF en nueva pestaña
                 with open(pdf_path, "rb") as f:
                     pdf_base64 = base64.b64encode(f.read()).decode()
