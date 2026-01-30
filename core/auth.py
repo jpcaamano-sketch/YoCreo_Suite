@@ -16,7 +16,7 @@ def mostrar_login():
     with col2:
         st.markdown("""
             <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #2D3436; margin-bottom: 5px;">YoCreo Suite</h1>
+                <h1 style="color: #2D3436; margin-bottom: 5px;">YoCreo IA</h1>
                 <p style="color: #6c757d;">Liderazgo Consciente</p>
             </div>
         """, unsafe_allow_html=True)
