@@ -232,8 +232,9 @@ def get_css():
         /* Logo en sidebar */
         .sidebar-logo {
             text-align: left;
-            padding: 0 0 20px 16px;
+            padding: 0 0 8px 16px;
             margin-top: -10px;
+            margin-bottom: 0;
         }
 
         .sidebar-logo img {
