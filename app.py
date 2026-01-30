@@ -73,11 +73,7 @@ def seleccionar(key):
 
 def render_menu_item(practica_key):
     """Renderiza un item del menu"""
-    is_selected = st.session_state.practica_sel == practica_key
-
-    # Indicador visual
-    indicator = "●" if is_selected else ""
-    label = f"{indicator} {PRACTICAS[practica_key]['titulo']}" if is_selected else PRACTICAS[practica_key]['titulo']
+    label = PRACTICAS[practica_key]['titulo']
 
     if st.button(label, key=f"b_{practica_key}", use_container_width=True):
         seleccionar(practica_key)
