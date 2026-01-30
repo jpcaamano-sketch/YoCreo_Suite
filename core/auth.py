@@ -4,7 +4,18 @@ Verifica suscripciones en Supabase
 """
 
 import streamlit as st
+import base64
+import os
 from .database import verificar_suscripcion, obtener_url_suscripcion
+
+
+def get_logo_base64():
+    """Obtiene el logo en base64"""
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "assets", "logo.png")
+    if os.path.exists(logo_path):
+        with open(logo_path, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    return None
 
 
 def mostrar_login():
@@ -14,19 +25,21 @@ def mostrar_login():
     col1, col2, col3 = st.columns([1, 2, 1])
 
     with col2:
-        st.markdown("""
+        logo_b64 = get_logo_base64()
+        logo_html = f'<img src="data:image/png;base64,{logo_b64}" style="height: 50px; margin-right: 10px; vertical-align: middle;">' if logo_b64 else ''
+
+        st.markdown(f"""
             <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #2D3436; margin-bottom: 5px;">YoCreo IA</h1>
-                <p style="color: #6c757d;">Liderazgo Consciente</p>
+                <h1 style="color: #2D3436; margin-bottom: 5px; display: flex; align-items: center; justify-content: center;">
+                    {logo_html}
+                    <span>YoCreo IA</span>
+                </h1>
+                <p style="color: #6c757d;">Suite Liderazgo Consciente</p>
             </div>
         """, unsafe_allow_html=True)
 
-        st.markdown("""
-            <div style="background: #FFFFFF; padding: 30px; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08);">
-        """, unsafe_allow_html=True)
-
         with st.form("login_form"):
-            st.markdown("### Acceder a la Suite")
+            st.markdown("### Accede a la Plataforma")
             st.markdown("<p style='color: #6c757d; font-size: 14px;'>Ingresa el email con el que te suscribiste</p>", unsafe_allow_html=True)
 
             email = st.text_input("Email", placeholder="tu@email.com", label_visibility="collapsed")
@@ -53,8 +66,6 @@ def mostrar_login():
                             st.warning("Tu suscripción fue cancelada. Renuévala para continuar.")
                         else:
                             st.error(resultado['message'])
-
-        st.markdown("</div>", unsafe_allow_html=True)
 
         # Link para suscribirse
         landing_url = obtener_url_suscripcion()
