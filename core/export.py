@@ -37,7 +37,7 @@ def render_encabezado(practica_key, titulo, descripcion):
     tiene_manual = os.path.exists(pdf_path)
 
     if tiene_manual:
-        col1, col2 = st.columns([0.85, 0.15])
+        col1, col2 = st.columns([0.94, 0.06])
         with col1:
             st.markdown(f"### {titulo}")
         with col2:
