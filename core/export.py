@@ -16,6 +16,7 @@ from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from docx import Document
+from core.config import ICONOS_SVG
 
 # Ruta de manuales
 MANUALES_PATH = os.path.join(os.path.dirname(__file__), "..", "manuales")
@@ -25,46 +26,79 @@ MANUALES_PATH = os.path.join(os.path.dirname(__file__), "..", "manuales")
 
 def render_encabezado(practica_key, titulo, descripcion):
     """
-    Renderiza el encabezado de una practica con boton de manual
+    Renderiza el encabezado de una practica con icono y boton de manual
 
     Args:
         practica_key: Key de la practica (ej: 'priorizador_tareas')
         titulo: Titulo de la practica
         descripcion: Descripcion breve
     """
+    # Obtener icono SVG
+    icono = ICONOS_SVG.get(practica_key, '')
+
     # Verificar si existe el manual
     pdf_path = os.path.join(MANUALES_PATH, f"{practica_key}.pdf")
     tiene_manual = os.path.exists(pdf_path)
 
     if tiene_manual:
-        col1, col2 = st.columns([0.94, 0.06])
-        with col1:
-            st.markdown(f"### {titulo}")
-        with col2:
-            if st.button("📖", key=f"manual_btn_{practica_key}", help=f"Ver Manual de {titulo}"):
-                # Abrir PDF en nueva pestaña
-                with open(pdf_path, "rb") as f:
-                    pdf_base64 = base64.b64encode(f.read()).decode()
+        # Leer PDF y convertir a base64
+        with open(pdf_path, "rb") as f:
+            pdf_base64 = base64.b64encode(f.read()).decode()
 
-                js_code = f'''
-                <script>
-                    const base64Data = "{pdf_base64}";
-                    const byteCharacters = atob(base64Data);
-                    const byteNumbers = new Array(byteCharacters.length);
-                    for (let i = 0; i < byteCharacters.length; i++) {{
-                        byteNumbers[i] = byteCharacters.charCodeAt(i);
+        # Icono SVG del manual (libro abierto)
+        icono_manual_svg = f'''<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#E67E22" stroke-width="2"><title>Manual: {titulo}</title><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'''
+
+        # Header con icono app, título y botón manual alineados
+        header_html = f'''
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+                {icono}
+                <h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1a1a2e;">{titulo}</h3>
+            </div>
+            <div id="manual_btn_{practica_key}"
+                 title="Manual: {titulo}"
+                 style="cursor: pointer; padding: 8px; border-radius: 8px; transition: background 0.2s;"
+                 onmouseover="this.style.background='#f0f0f0'"
+                 onmouseout="this.style.background='transparent'">
+                {icono_manual_svg}
+            </div>
+        </div>
+        '''
+        st.markdown(header_html, unsafe_allow_html=True)
+
+        # JavaScript para abrir el PDF
+        js_code = f'''
+        <script>
+            (function() {{
+                function setupManualButton() {{
+                    const btn = window.parent.document.getElementById('manual_btn_{practica_key}');
+                    if (btn) {{
+                        btn.onclick = function() {{
+                            const base64Data = "{pdf_base64}";
+                            const byteCharacters = atob(base64Data);
+                            const byteNumbers = new Array(byteCharacters.length);
+                            for (let i = 0; i < byteCharacters.length; i++) {{
+                                byteNumbers[i] = byteCharacters.charCodeAt(i);
+                            }}
+                            const byteArray = new Uint8Array(byteNumbers);
+                            const blob = new Blob([byteArray], {{type: 'application/pdf'}});
+                            const blobUrl = URL.createObjectURL(blob);
+                            window.parent.open(blobUrl, '_blank');
+                        }};
                     }}
-                    const byteArray = new Uint8Array(byteNumbers);
-                    const blob = new Blob([byteArray], {{type: 'application/pdf'}});
-                    const blobUrl = URL.createObjectURL(blob);
-                    window.open(blobUrl, '_blank');
-                </script>
-                '''
-                components.html(js_code, height=0, width=0)
+                }}
+                // Intentar configurar inmediatamente y también después de un pequeño delay
+                setupManualButton();
+                setTimeout(setupManualButton, 100);
+                setTimeout(setupManualButton, 500);
+            }})();
+        </script>
+        '''
+        components.html(js_code, height=0, width=0)
     else:
-        st.markdown(f"### {titulo}")
+        st.markdown(f'<div style="display: flex; align-items: center; gap: 12px;">{icono}<h3 style="margin: 0; font-size: 22px; font-weight: 700; color: #1a1a2e;">{titulo}</h3></div>', unsafe_allow_html=True)
 
-    st.write(descripcion)
+    st.markdown(f'<p class="descripcion-practica">{descripcion}</p>', unsafe_allow_html=True)
 
 
 # ==================== BOTON COPIAR (Protocolo Estandar) ====================

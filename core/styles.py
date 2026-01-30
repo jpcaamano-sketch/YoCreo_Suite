@@ -213,6 +213,7 @@ def get_css():
         /* Sidebar general - Fondo oscuro */
         [data-testid="stSidebar"] {
             background-color: #2D3436 !important;
+            box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3) !important;
         }
 
         [data-testid="stSidebar"] > div:first-child {
@@ -232,7 +233,7 @@ def get_css():
         /* Logo en sidebar */
         .sidebar-logo {
             text-align: left;
-            padding: 0 0 20px 16px;
+            padding: 0 0 35px 16px;
             margin-top: -10px;
         }
 
@@ -243,14 +244,24 @@ def get_css():
 
         /* Categoria titulo en sidebar - Texto claro */
         .cat-title {
-            font-family: 'Inter', sans-serif !important;
-            font-size: 12px !important;
+            font-family: 'Hiragino Kaku Gothic Std', 'Hiragino Sans', sans-serif !important;
+            font-size: 10px !important;
             font-weight: 700 !important;
             color: #95A5A6 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.5px !important;
-            margin: 16px 0 24px 10px !important;
-            padding: 0 !important;
+            margin: 0 0 0 10px !important;
+            padding: 0 0 25px 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            min-height: 20px !important;
+        }
+
+        /* Separador en sidebar */
+        .sidebar-divider {
+            border: none;
+            border-top: 1px solid #4a4a4a;
+            margin: 20px 10px !important;
         }
 
         /* Forzar espaciado compacto en sidebar */
@@ -259,7 +270,7 @@ def get_css():
         }
 
         [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
-            margin-bottom: -3px !important;
+            margin-bottom: 0 !important;
         }
 
         /* Botones menu en sidebar - Texto blanco */
@@ -274,19 +285,20 @@ def get_css():
             border: none !important;
             border-left: 3px solid transparent !important;
             border-radius: 0 !important;
-            padding: 0px 6px 0px 10px !important;
+            padding: 0 10px 0 24px !important;
             font-family: 'Inter', sans-serif !important;
             font-weight: 400 !important;
-            font-size: 12px !important;
-            transform: scale(0.75) !important;
-            transform-origin: left center !important;
+            font-size: 10px !important;
             text-align: left !important;
             justify-content: flex-start !important;
+            align-items: center !important;
             box-shadow: none !important;
-            margin: -2px 0 !important;
-            min-height: 18px !important;
-            height: 18px !important;
-            line-height: 1 !important;
+            margin: 0 0 10px 0 !important;
+            min-height: 20px !important;
+            height: 20px !important;
+            line-height: 20px !important;
+            transform: scale(0.75) !important;
+            transform-origin: left center !important;
             transition: all 0.2s ease !important;
         }
 

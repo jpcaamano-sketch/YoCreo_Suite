@@ -22,7 +22,7 @@ from core.auth import (
     mostrar_login,
     verificar_autenticacion,
     obtener_usuario_actual,
-    mostrar_info_usuario
+    cerrar_sesion
 )
 
 # Aplicar estilos
@@ -92,32 +92,46 @@ with st.sidebar:
             unsafe_allow_html=True
         )
 
-    # Introduccion (sin titulo de categoria)
-    for p in CATEGORIAS["inicio"]["practicas"]:
-        render_menu_item(p)
+    # ===== ADMINISTRACIÓN =====
+    st.markdown("<p class='cat-title'>Administración</p>", unsafe_allow_html=True)
 
-    # Categoria 1
-    st.markdown("<p class='cat-title'>Autogestion y Foco</p>", unsafe_allow_html=True)
+    # Bienvenido a la plataforma
+    if st.button("Bienvenido a la plataforma", key="b_introduccion", use_container_width=True):
+        seleccionar("introduccion")
+        st.rerun()
+
+    # Administrar Cuenta (solo para admin de empresa)
+    user_role = st.session_state.get('user_role', {})
+    if user_role.get('tipo') == 'empresa_admin':
+        if st.button("Administrar Cuenta", key="b_admin_panel", use_container_width=True):
+            seleccionar("admin_panel")
+            st.rerun()
+
+    # Cerrar sesión
+    if st.button("Cerrar sesión", key="b_logout", use_container_width=True):
+        cerrar_sesion()
+        st.rerun()
+
+
+    # ===== AUTOGESTIÓN Y FOCO =====
+    st.markdown("<p class='cat-title'>Autogestión y Foco</p>", unsafe_allow_html=True)
     for p in CATEGORIAS["autogestion"]["practicas"]:
         render_menu_item(p)
 
-    # Categoria 2
-    st.markdown("<p class='cat-title'>Coordinacion Impecable</p>", unsafe_allow_html=True)
+    # ===== COORDINACIÓN IMPECABLE =====
+    st.markdown("<p class='cat-title'>Coordinación Impecable</p>", unsafe_allow_html=True)
     for p in CATEGORIAS["coordinacion"]["practicas"]:
         render_menu_item(p)
 
-    # Categoria 3
+    # ===== DESARROLLO DE OTROS =====
     st.markdown("<p class='cat-title'>Desarrollo de Otros</p>", unsafe_allow_html=True)
     for p in CATEGORIAS["desarrollo"]["practicas"]:
         render_menu_item(p)
 
-    # Categoria 4
+    # ===== ESTRATEGIA Y RELACIONES =====
     st.markdown("<p class='cat-title'>Estrategia y Relaciones</p>", unsafe_allow_html=True)
     for p in CATEGORIAS["estrategia"]["practicas"]:
         render_menu_item(p)
-
-    # Info usuario y logout
-    mostrar_info_usuario()
 
 
 # ==================== CONTENIDO PRINCIPAL ====================
@@ -172,6 +186,9 @@ elif practica_seleccionada == "definicion_objetivos":
     render()
 elif practica_seleccionada == "disculpas_efectivas":
     from practicas.disculpas_efectivas import render
+    render()
+elif practica_seleccionada == "admin_panel":
+    from practicas.admin_panel import render
     render()
 else:
     st.markdown('<div class="custom-warning">Practica no disponible</div>', unsafe_allow_html=True)

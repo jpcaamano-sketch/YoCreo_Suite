@@ -6,7 +6,7 @@ Verifica suscripciones en Supabase
 import streamlit as st
 import base64
 import os
-from .database import verificar_suscripcion, obtener_url_suscripcion
+from .database import verificar_suscripcion, obtener_url_suscripcion, get_supabase
 
 
 def get_logo_base64():
@@ -16,6 +16,69 @@ def get_logo_base64():
         with open(logo_path, "rb") as f:
             return base64.b64encode(f.read()).decode()
     return None
+
+
+def obtener_rol_usuario(email: str) -> dict:
+    """
+    Retorna información del usuario y su rol.
+    Returns: {
+        'tipo': 'individual' | 'empresa_admin' | 'empresa_member' | None,
+        'organization_id': UUID | None,
+        'organization_name': str | None
+    }
+    """
+    try:
+        supabase = get_supabase()
+        email_lower = email.lower()
+        print(f"[DEBUG] Verificando rol para email: {email_lower}")
+
+        # Verificar si es suscriptor individual
+        individual = supabase.table('subscriptions').select('*').eq('email', email_lower).eq('status', 'active').execute()
+        print(f"[DEBUG] Subscriptions result: {individual.data}")
+        if individual.data:
+            return {
+                'tipo': 'individual',
+                'organization_id': None,
+                'organization_name': None
+            }
+
+        # Verificar si es miembro de organización activa
+        member = supabase.table('organization_members').select(
+            '*, organizations(*)'
+        ).eq('email', email_lower).eq('status', 'active').execute()
+        print(f"[DEBUG] Organization members result: {member.data}")
+
+        if member.data:
+            member_data = member.data[0]
+            org = member_data.get('organizations', {})
+            print(f"[DEBUG] Org data: {org}")
+            print(f"[DEBUG] Role: {member_data.get('role')}")
+
+            # Verificar que la organización esté activa
+            if org and org.get('status') == 'active':
+                role = member_data.get('role', 'member')
+                result = {
+                    'tipo': 'empresa_admin' if role == 'admin' else 'empresa_member',
+                    'organization_id': org.get('id'),
+                    'organization_name': org.get('name')
+                }
+                print(f"[DEBUG] Returning: {result}")
+                return result
+
+        print("[DEBUG] No membership found, returning None")
+        return {
+            'tipo': None,
+            'organization_id': None,
+            'organization_name': None
+        }
+
+    except Exception as e:
+        print(f"Error obteniendo rol de usuario: {e}")
+        return {
+            'tipo': None,
+            'organization_id': None,
+            'organization_name': None
+        }
 
 
 def mostrar_login():
@@ -49,14 +112,21 @@ def mostrar_login():
                 if not email:
                     st.error("Ingresa tu email")
                 else:
-                    resultado = verificar_suscripcion(email.strip())
+                    email_clean = email.strip().lower()
 
-                    if resultado['tiene_suscripcion']:
+                    # Primero verificar suscripción individual
+                    resultado = verificar_suscripcion(email_clean)
+
+                    # También verificar si es miembro de organización
+                    rol_usuario = obtener_rol_usuario(email_clean)
+
+                    if resultado['tiene_suscripcion'] or rol_usuario['tipo'] is not None:
                         st.session_state.user = {
-                            'email': email.strip().lower(),
-                            'status': resultado['status'],
+                            'email': email_clean,
+                            'status': resultado['status'] if resultado['tiene_suscripcion'] else 'active',
                             'customer_id': resultado['customer_id']
                         }
+                        st.session_state.user_role = rol_usuario
                         st.session_state.authenticated = True
                         st.rerun()
                     else:
@@ -97,6 +167,12 @@ def verificar_autenticacion():
     if not st.session_state.authenticated:
         return False
 
+    # Verificar que tenga rol asignado
+    if 'user_role' not in st.session_state:
+        user = st.session_state.get('user')
+        if user:
+            st.session_state.user_role = obtener_rol_usuario(user['email'])
+
     return True
 
 
@@ -111,6 +187,7 @@ def cerrar_sesion():
     """Cierra la sesión del usuario"""
     st.session_state.authenticated = False
     st.session_state.user = None
+    st.session_state.user_role = None
     if 'practica_sel' in st.session_state:
         del st.session_state.practica_sel
 
@@ -121,10 +198,22 @@ def mostrar_info_usuario():
     if user:
         status_text = "Activa" if user.get('status') == 'active' else "Trial"
 
+        # Mostrar información de organización si aplica
+        user_role = st.session_state.get('user_role', {})
+        org_name = user_role.get('organization_name')
+        role_type = user_role.get('tipo')
+
+        role_badge = ""
+        if role_type == 'empresa_admin':
+            role_badge = f"<p style='color: #9B59B6; font-size: 10px; margin: 0;'>Admin: {org_name}</p>"
+        elif role_type == 'empresa_member':
+            role_badge = f"<p style='color: #3498DB; font-size: 10px; margin: 0;'>{org_name}</p>"
+
         st.markdown(f"""
             <div style="padding: 10px; margin-top: 20px; border-top: 1px solid #4a4a4a;">
                 <p style="color: #FFFFFF; font-size: 11px; margin: 0;">{user['email']}</p>
                 <p style="color: #95A5A6; font-size: 10px; margin: 0;">Suscripción: {status_text}</p>
+                {role_badge}
             </div>
         """, unsafe_allow_html=True)
 
