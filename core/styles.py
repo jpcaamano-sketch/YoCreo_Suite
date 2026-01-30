@@ -232,9 +232,8 @@ def get_css():
         /* Logo en sidebar */
         .sidebar-logo {
             text-align: left;
-            padding: 0 0 8px 16px;
+            padding: 0 0 20px 16px;
             margin-top: -10px;
-            margin-bottom: 0;
         }
 
         .sidebar-logo img {
@@ -250,17 +249,17 @@ def get_css():
             color: #95A5A6 !important;
             text-transform: uppercase !important;
             letter-spacing: 0.5px !important;
-            margin: 20px 0 8px 10px !important;
+            margin: 16px 0 24px 10px !important;
             padding: 0 !important;
         }
 
-        /* Forzar espaciado uniforme en sidebar */
+        /* Forzar espaciado compacto en sidebar */
         [data-testid="stSidebar"] [data-testid="stVerticalBlock"] {
-            gap: 4px !important;
+            gap: 0 !important;
         }
 
         [data-testid="stSidebar"] [data-testid="stVerticalBlock"] > div {
-            margin-bottom: 0 !important;
+            margin-bottom: -3px !important;
         }
 
         /* Botones menu en sidebar - Texto blanco */
@@ -275,7 +274,7 @@ def get_css():
             border: none !important;
             border-left: 3px solid transparent !important;
             border-radius: 0 !important;
-            padding: 4px 6px 4px 10px !important;
+            padding: 0px 6px 0px 10px !important;
             font-family: 'Inter', sans-serif !important;
             font-weight: 400 !important;
             font-size: 12px !important;
@@ -284,10 +283,10 @@ def get_css():
             text-align: left !important;
             justify-content: flex-start !important;
             box-shadow: none !important;
-            margin: 0 !important;
-            min-height: 24px !important;
-            height: auto !important;
-            line-height: 1.2 !important;
+            margin: -2px 0 !important;
+            min-height: 18px !important;
+            height: 18px !important;
+            line-height: 1 !important;
             transition: all 0.2s ease !important;
         }
 
@@ -332,12 +331,12 @@ def get_css():
         /* Reducir gap entre columnas en sidebar */
         [data-testid="stSidebar"] [data-testid="stHorizontalBlock"] {
             gap: 0 !important;
-            margin-bottom: 0 !important;
+            margin-bottom: -6px !important;
         }
 
         /* Espaciado uniforme entre elementos */
         [data-testid="stSidebar"] .element-container {
-            margin-bottom: 0 !important;
+            margin-bottom: 2px !important;
             padding: 0 !important;
         }
 
