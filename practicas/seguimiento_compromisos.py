@@ -9,6 +9,7 @@ import json
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -129,6 +130,7 @@ OPCION 3: FORMAL (Ultimatum)
 {data['formal']}"""
                         st.session_state.seg_resultado = resultado
                         st.session_state.seg_ctx = {"compromiso": compromiso, "persona": persona}
+                        registrar_uso("seguimiento_compromisos")
                     else:
                         st.markdown('<div class="custom-error">No se pudieron generar los mensajes. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:

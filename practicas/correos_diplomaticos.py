@@ -9,6 +9,7 @@ import json
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -109,6 +110,7 @@ def render():
                     if data:
                         st.session_state.mail_versions = data
                         st.session_state.mail_original = texto_input
+                        registrar_uso("correos_diplomaticos")
                         resultado = f"""ORIGINAL:
 {texto_input}
 

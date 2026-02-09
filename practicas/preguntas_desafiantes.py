@@ -9,6 +9,7 @@ import json
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -102,6 +103,7 @@ def render():
                     data = generar_grow_ai(situacion_in)
                     if data:
                         st.session_state.grow_resultado = data['guia']
+                        registrar_uso("preguntas_desafiantes")
                     else:
                         st.markdown('<div class="custom-error">No se pudieron generar las preguntas. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:

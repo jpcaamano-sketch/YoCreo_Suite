@@ -9,6 +9,7 @@ import json
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -111,6 +112,7 @@ OBJETIVOS ESPECIFICOS:
 PRIMER PASO DE ACCION:
 {res['plan_accion']}"""
                         st.session_state.obj_resultado = resultado
+                        registrar_uso("definicion_objetivos")
                     else:
                         st.markdown('<div class="custom-error">No se pudieron generar los objetivos. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:

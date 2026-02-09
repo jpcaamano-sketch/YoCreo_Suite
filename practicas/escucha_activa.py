@@ -10,6 +10,7 @@ import re
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -153,6 +154,7 @@ def render():
                                 "puntaje": evaluacion.get('puntaje', 0)
                             })
                             st.session_state.escucha_historial = st.session_state.escucha_historial[:5]
+                            registrar_uso("escucha_activa")
         else:
             st.write("Presiona el boton para comenzar el simulacro.")
 

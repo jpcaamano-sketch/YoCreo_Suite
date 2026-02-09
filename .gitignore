@@ -1,6 +1,46 @@
-venv/
-__pycache__/
-*.pyc
+# Secrets y credenciales (NUNCA subir)
 .streamlit/secrets.toml
+**/secrets.toml
+**/.env
+**/.env.*
+!**/.env.example
+
+# Python
+venv/
+**/venv/
+__pycache__/
+**/__pycache__/
+*.pyc
+
+# Prácticas standalone (versiones anteriores, no son parte de la suite)
+0. Practicas_coaching/
+01. Priorizador_tareas/
+02. Presentacion_inspiradora/
+03. Pedidos impecables/
+04. Delegacion_situacional/
+05. Mensajes_diplomáticos/
+06. Seguimiento_compromisos/
+07. Escucha_activa/
+08. Preguntas_desafiantes/
+09. Feedback_constructivo/
+10 Evaluacion_desempeño/
+11. Definicion_objetivos/
+12. Planificador_reuniones/
+13. Negociador_harvard/
+14. Disculpas_efectivas/
+
+# Landing page (se despliega por separado en Vercel)
+landing/
+
+# Documentación interna
+Manual usuario/
+
+# Base de datos local
+data/*.db
+
+# OS
 .DS_Store
+**/.DS_Store
+
+# Test
 test_sidebar.py

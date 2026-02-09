@@ -9,6 +9,7 @@ import json
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -126,6 +127,7 @@ CONSEJO:
 {data['consejo']}"""
                         st.session_state.fb_resultado = resultado
                         st.session_state.fb_nombre = nombre_input
+                        registrar_uso("feedback_constructivo")
                     else:
                         st.markdown('<div class="custom-error">No se pudo generar el feedback. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:

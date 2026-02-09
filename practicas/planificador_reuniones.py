@@ -14,6 +14,7 @@ from reportlab.lib import colors
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -105,6 +106,7 @@ def render():
                             txt += f"- {item['minutos']} min: {item['actividad']} ({item['responsable']})\n"
                         txt += f"\nCONSEJOS:\n{data.get('consejos', '')}"
                         st.session_state.agenda_resultado = txt
+                        registrar_uso("planificador_reuniones")
                     else:
                         st.markdown('<div class="custom-error">No se pudo generar la agenda. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:

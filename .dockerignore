@@ -1,0 +1,37 @@
+# Entornos virtuales
+venv/
+__pycache__/
+*.pyc
+
+# Prácticas standalone (no son parte de la app principal)
+0. Practicas_coaching/
+01. Priorizador_tareas/
+02. Presentacion_inspiradora/
+03. Pedidos impecables/
+04. Delegacion_situacional/
+05. Mensajes_diplomáticos/
+06. Seguimiento_compromisos/
+07. Escucha_activa/
+08. Preguntas_desafiantes/
+09. Feedback_constructivo/
+10 Evaluacion_desempeño/
+11. Definicion_objetivos/
+12. Planificador_reuniones/
+13. Negociador_harvard/
+14. Disculpas_efectivas/
+
+# Landing page (se despliega por separado en Vercel)
+landing/
+
+# Archivos innecesarios en producción
+Manual usuario/
+migrations/
+test_sidebar.py
+.git/
+.gitignore
+.DS_Store
+Dockerfile
+.dockerignore
+
+# Secrets (se inyectan como variables de entorno)
+.streamlit/secrets.toml

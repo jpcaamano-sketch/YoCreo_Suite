@@ -10,6 +10,7 @@ from datetime import date
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -127,6 +128,7 @@ def render():
                     data = generar_pedido_ai(oyente_in, accion_in, condiciones_in, tiempo_str, trasfondo_in)
                     if data and 'carta' in data:
                         st.session_state.pedido_resultado = data['carta']
+                        registrar_uso("pedidos_impecables")
                     else:
                         st.markdown('<div class="custom-error">No se pudo generar el pedido. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:

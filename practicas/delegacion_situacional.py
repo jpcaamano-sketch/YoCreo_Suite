@@ -9,6 +9,7 @@ import json
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -130,6 +131,7 @@ GUION DE CONVERSACION:
 {data['guion']}"""
                         st.session_state.deleg_resultado = res_texto
                         st.session_state.deleg_colab = colab_input
+                        registrar_uso("delegacion_situacional")
                     else:
                         st.markdown('<div class="custom-error">No se pudo generar la estrategia. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:

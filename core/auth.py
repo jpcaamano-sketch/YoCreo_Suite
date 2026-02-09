@@ -3,10 +3,13 @@ Sistema de autenticación para YoCreo Suite
 Verifica suscripciones en Supabase
 """
 
+import logging
 import streamlit as st
 import base64
 import os
 from .database import verificar_suscripcion, obtener_url_suscripcion, get_supabase
+
+logger = logging.getLogger(__name__)
 
 
 def get_logo_base64():
@@ -30,11 +33,9 @@ def obtener_rol_usuario(email: str) -> dict:
     try:
         supabase = get_supabase()
         email_lower = email.lower()
-        print(f"[DEBUG] Verificando rol para email: {email_lower}")
 
         # Verificar si es suscriptor individual
         individual = supabase.table('subscriptions').select('*').eq('email', email_lower).eq('status', 'active').execute()
-        print(f"[DEBUG] Subscriptions result: {individual.data}")
         if individual.data:
             return {
                 'tipo': 'individual',
@@ -46,26 +47,20 @@ def obtener_rol_usuario(email: str) -> dict:
         member = supabase.table('organization_members').select(
             '*, organizations(*)'
         ).eq('email', email_lower).eq('status', 'active').execute()
-        print(f"[DEBUG] Organization members result: {member.data}")
 
         if member.data:
             member_data = member.data[0]
             org = member_data.get('organizations', {})
-            print(f"[DEBUG] Org data: {org}")
-            print(f"[DEBUG] Role: {member_data.get('role')}")
 
             # Verificar que la organización esté activa
             if org and org.get('status') == 'active':
                 role = member_data.get('role', 'member')
-                result = {
+                return {
                     'tipo': 'empresa_admin' if role == 'admin' else 'empresa_member',
                     'organization_id': org.get('id'),
                     'organization_name': org.get('name')
                 }
-                print(f"[DEBUG] Returning: {result}")
-                return result
 
-        print("[DEBUG] No membership found, returning None")
         return {
             'tipo': None,
             'organization_id': None,
@@ -73,7 +68,7 @@ def obtener_rol_usuario(email: str) -> dict:
         }
 
     except Exception as e:
-        print(f"Error obteniendo rol de usuario: {e}")
+        logger.warning("Error obteniendo rol de usuario: %s", e)
         return {
             'tipo': None,
             'organization_id': None,

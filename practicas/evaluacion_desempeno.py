@@ -9,6 +9,7 @@ import json
 from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
+from core.analytics import registrar_uso
 
 
 def limpiar_json(texto):
@@ -100,6 +101,7 @@ ANALISIS DE SESGOS:
 VERSION CORREGIDA (Neutral):
 {data['texto_neutral']}"""
                         st.session_state.sesgos_resultado = resultado
+                        registrar_uso("evaluacion_desempeno")
                     else:
                         st.markdown('<div class="custom-error">No se pudo analizar el texto. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:
