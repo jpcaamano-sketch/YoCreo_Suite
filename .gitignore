@@ -29,8 +29,11 @@ __pycache__/
 13. Negociador_harvard/
 14. Disculpas_efectivas/
 
-# Landing page (se despliega por separado en Vercel)
-landing/
+# Landing page: excluir artefactos de build
+landing/node_modules/
+landing/.next/
+landing/.vercel/
+landing/package-lock.json
 
 # Documentación interna
 Manual usuario/
