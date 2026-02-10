@@ -42,7 +42,8 @@ export async function POST(request: NextRequest) {
                 customer_id: customerId,
                 subscription_id: subscriptionId,
                 status: "active",
-                max_members: 10,
+                max_members: null,
+                seat_count: 1,
               })
               .select()
               .single();
@@ -76,6 +77,7 @@ export async function POST(request: NextRequest) {
 
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
+        const quantity = subscription.items.data[0]?.quantity ?? null;
 
         await supabase
           .from("subscriptions")
@@ -90,6 +92,7 @@ export async function POST(request: NextRequest) {
           .update({
             status: subscription.status,
             updated_at: new Date().toISOString(),
+            ...(quantity !== null ? { seat_count: quantity } : {}),
           })
           .eq("subscription_id", subscription.id);
         break;

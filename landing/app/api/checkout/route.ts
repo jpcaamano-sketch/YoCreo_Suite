@@ -7,10 +7,7 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { planType = "individual", companyName } = body;
 
-    const priceId =
-      planType === "empresa"
-        ? process.env.STRIPE_PRICE_EMPRESA_ID!
-        : process.env.STRIPE_PRICE_ID!;
+    const priceId = process.env.STRIPE_PRICE_ID!;
 
     const session = await stripe.checkout.sessions.create({
       mode: "subscription",

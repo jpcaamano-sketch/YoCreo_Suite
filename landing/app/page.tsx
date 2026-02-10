@@ -56,7 +56,7 @@ const beneficios = [
   },
   {
     titulo: "Para líderes y equipos",
-    desc: "Plan individual para profesionales. Plan empresa con panel de administración para hasta 10 personas.",
+    desc: "Plan individual para profesionales. Plan empresa con panel de administración y usuarios ilimitados.",
   },
 ];
 
@@ -75,7 +75,7 @@ const faqs = [
   },
   {
     q: "¿Cómo funciona el plan Empresa?",
-    a: "El administrador suscribe a la empresa y luego agrega hasta 10 miembros desde el panel de administración. Cada miembro accede con su propio email.",
+    a: "El administrador suscribe a la empresa y agrega miembros desde el panel de administración. Cada miembro cuesta $10.000/mes y se cobra automáticamente. Sin límite de usuarios. Cada miembro accede con su propio email.",
   },
   {
     q: "¿Mis datos están seguros?",
@@ -305,13 +305,16 @@ export default function Home() {
             </div>
             <p className="text-gray-400 text-sm mb-4">Para equipos</p>
             <div className="flex items-baseline justify-center gap-2 mb-4">
-              <span className="text-4xl font-bold text-white">$50.000</span>
-              <span className="text-gray-400">/mes</span>
+              <span className="text-4xl font-bold text-white">$10.000</span>
+              <span className="text-gray-400">/mes por usuario</span>
             </div>
+            <p className="text-purple-300 text-xs text-center mb-4">
+              Empieza con 1 usuario. Agrega más desde el panel.
+            </p>
             <ul className="text-left text-gray-300 space-y-2 mb-6">
               <li className="flex items-center gap-2">
-                <span className="text-green-400">&#10003;</span> Hasta 10
-                usuarios
+                <span className="text-green-400">&#10003;</span> Usuarios
+                ilimitados
               </li>
               <li className="flex items-center gap-2">
                 <span className="text-green-400">&#10003;</span> 14 practicas

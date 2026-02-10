@@ -7,6 +7,7 @@ GOOGLE_API_KEY = "${GOOGLE_API_KEY}"
 SUPABASE_URL = "${SUPABASE_URL}"
 SUPABASE_ANON_KEY = "${SUPABASE_ANON_KEY}"
 LANDING_URL = "${LANDING_URL}"
+API_SECRET_KEY = "${API_SECRET_KEY}"
 EOF
 
 exec streamlit run app.py --server.port=${PORT:-8501} --server.address=0.0.0.0
