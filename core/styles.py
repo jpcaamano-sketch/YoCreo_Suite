@@ -46,8 +46,18 @@ def get_css():
             max-width: 800px;
         }
 
-        /* Contenedores principales: Tarjeta blanca con sombra */
+        /* Contenedor exterior: transparente */
         [data-testid="stVerticalBlockBorderWrapper"] {
+            background-color: transparent !important;
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            margin-bottom: 0 !important;
+            box-shadow: none !important;
+        }
+
+        /* Contenedores internos (st.container(border=True)): Tarjeta blanca con sombra */
+        [data-testid="stVerticalBlockBorderWrapper"] [data-testid="stVerticalBlockBorderWrapper"] {
             background-color: #FFFFFF !important;
             border: none !important;
             border-radius: 16px !important;
