@@ -79,76 +79,72 @@ def obtener_rol_usuario(email: str) -> dict:
 def mostrar_login():
     """Muestra el formulario de acceso"""
 
-    # Centrar contenido
-    col1, col2, col3 = st.columns([1, 2, 1])
+    logo_b64 = get_logo_base64()
+    logo_html = f'<img src="data:image/png;base64,{logo_b64}" style="height: 50px; margin-right: 10px; vertical-align: middle;">' if logo_b64 else ''
 
-    with col2:
-        logo_b64 = get_logo_base64()
-        logo_html = f'<img src="data:image/png;base64,{logo_b64}" style="height: 50px; margin-right: 10px; vertical-align: middle;">' if logo_b64 else ''
+    st.markdown(f"""
+        <div style="text-align: center; margin-bottom: 30px;">
+            <h1 style="color: #2D3436; margin-bottom: 5px; display: flex; align-items: center; justify-content: center;">
+                {logo_html}
+                <span>YoCreo IA</span>
+            </h1>
+            <p style="color: #6c757d;">Suite Liderazgo Consciente</p>
+        </div>
+    """, unsafe_allow_html=True)
 
-        st.markdown(f"""
-            <div style="text-align: center; margin-bottom: 30px;">
-                <h1 style="color: #2D3436; margin-bottom: 5px; display: flex; align-items: center; justify-content: center;">
-                    {logo_html}
-                    <span>YoCreo IA</span>
-                </h1>
-                <p style="color: #6c757d;">Suite Liderazgo Consciente</p>
-            </div>
-        """, unsafe_allow_html=True)
+    with st.form("login_form"):
+        st.markdown("### Accede a la Plataforma")
+        st.markdown("<p style='color: #6c757d; font-size: 14px;'>Ingresa el email con el que te suscribiste</p>", unsafe_allow_html=True)
 
-        with st.form("login_form"):
-            st.markdown("### Accede a la Plataforma")
-            st.markdown("<p style='color: #6c757d; font-size: 14px;'>Ingresa el email con el que te suscribiste</p>", unsafe_allow_html=True)
+        email = st.text_input("Email", placeholder="tu@email.com", label_visibility="collapsed")
+        submit = st.form_submit_button("Ingresar", use_container_width=True)
 
-            email = st.text_input("Email", placeholder="tu@email.com", label_visibility="collapsed")
-            submit = st.form_submit_button("Ingresar", use_container_width=True)
+        if submit:
+            if not email:
+                st.error("Ingresa tu email")
+            else:
+                email_clean = email.strip().lower()
 
-            if submit:
-                if not email:
-                    st.error("Ingresa tu email")
+                # Primero verificar suscripción individual
+                resultado = verificar_suscripcion(email_clean)
+
+                # También verificar si es miembro de organización
+                rol_usuario = obtener_rol_usuario(email_clean)
+
+                if resultado['tiene_suscripcion'] or rol_usuario['tipo'] is not None:
+                    st.session_state.user = {
+                        'email': email_clean,
+                        'status': resultado['status'] if resultado['tiene_suscripcion'] else 'active',
+                        'customer_id': resultado['customer_id']
+                    }
+                    st.session_state.user_role = rol_usuario
+                    st.session_state.authenticated = True
+                    st.rerun()
                 else:
-                    email_clean = email.strip().lower()
-
-                    # Primero verificar suscripción individual
-                    resultado = verificar_suscripcion(email_clean)
-
-                    # También verificar si es miembro de organización
-                    rol_usuario = obtener_rol_usuario(email_clean)
-
-                    if resultado['tiene_suscripcion'] or rol_usuario['tipo'] is not None:
-                        st.session_state.user = {
-                            'email': email_clean,
-                            'status': resultado['status'] if resultado['tiene_suscripcion'] else 'active',
-                            'customer_id': resultado['customer_id']
-                        }
-                        st.session_state.user_role = rol_usuario
-                        st.session_state.authenticated = True
-                        st.rerun()
+                    if resultado['status'] == 'none':
+                        st.warning("Este email no tiene una suscripción activa.")
+                    elif resultado['status'] == 'canceled':
+                        st.warning("Tu suscripción fue cancelada. Renuévala para continuar.")
                     else:
-                        if resultado['status'] == 'none':
-                            st.warning("Este email no tiene una suscripción activa.")
-                        elif resultado['status'] == 'canceled':
-                            st.warning("Tu suscripción fue cancelada. Renuévala para continuar.")
-                        else:
-                            st.error(resultado['message'])
+                        st.error(resultado['message'])
 
-        # Link para suscribirse
-        landing_url = obtener_url_suscripcion()
-        st.markdown(f"""
-            <div style="text-align: center; margin-top: 24px;">
-                <p style="color: #6c757d; font-size: 14px; margin-bottom: 12px;">¿No tienes suscripción?</p>
-                <a href="{landing_url}" target="_blank" style="
-                    display: inline-block;
-                    background-color: #E67E22;
-                    color: white;
-                    padding: 12px 24px;
-                    border-radius: 10px;
-                    text-decoration: none;
-                    font-weight: 600;
-                    font-size: 14px;
-                ">Suscribirme Ahora</a>
-            </div>
-        """, unsafe_allow_html=True)
+    # Link para suscribirse
+    landing_url = obtener_url_suscripcion()
+    st.markdown(f"""
+        <div style="text-align: center; margin-top: 24px;">
+            <p style="color: #6c757d; font-size: 14px; margin-bottom: 12px;">¿No tienes suscripción?</p>
+            <a href="{landing_url}" target="_blank" style="
+                display: inline-block;
+                background-color: #E67E22;
+                color: white;
+                padding: 12px 24px;
+                border-radius: 10px;
+                text-decoration: none;
+                font-weight: 600;
+                font-size: 14px;
+            ">Suscribirme Ahora</a>
+        </div>
+    """, unsafe_allow_html=True)
 
 
 def verificar_autenticacion():

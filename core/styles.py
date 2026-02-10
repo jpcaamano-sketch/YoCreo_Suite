@@ -31,6 +31,11 @@ def get_css():
         footer {visibility: hidden;}
         header {display: none !important;}
 
+        /* Ocultar "Press Enter to submit form" */
+        [data-testid="InputInstructions"] {
+            display: none !important;
+        }
+
         /* Ocultar boton X del sidebar */
         [data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] {display: none !important;}
 
