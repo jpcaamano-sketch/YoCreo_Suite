@@ -89,9 +89,9 @@ def get_css():
             margin-bottom: 20px !important;
         }
 
-        /* Boton de Accion: Naranja */
+        /* Boton de Accion */
         div.stButton > button {
-            background-color: #E67E22 !important;
+            background-color: #FF6B4E !important;
             color: white !important;
             border: none !important;
             border-radius: 10px !important;
@@ -100,14 +100,14 @@ def get_css():
             font-weight: 600 !important;
             font-size: 15px !important;
             width: 100% !important;
-            box-shadow: 0 4px 12px rgba(230, 126, 34, 0.3) !important;
+            box-shadow: 0 4px 12px rgba(255, 107, 78, 0.3) !important;
             transition: all 0.2s ease !important;
         }
 
         div.stButton > button:hover {
-            background-color: #D35400 !important;
+            background-color: #E5553A !important;
             transform: translateY(-2px) !important;
-            box-shadow: 0 6px 16px rgba(230, 126, 34, 0.4) !important;
+            box-shadow: 0 6px 16px rgba(255, 107, 78, 0.4) !important;
         }
 
         /* Boton de Descarga: Gris oscuro */
@@ -150,8 +150,8 @@ def get_css():
         }
 
         .stTextInput input:focus, .stTextArea textarea:focus {
-            border-color: #E67E22 !important;
-            box-shadow: 0 0 0 2px rgba(230, 126, 34, 0.15) !important;
+            border-color: #FF6B4E !important;
+            box-shadow: 0 0 0 2px rgba(255, 107, 78, 0.15) !important;
             background-color: #FFFFFF !important;
         }
 
