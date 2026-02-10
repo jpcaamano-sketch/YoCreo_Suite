@@ -225,14 +225,14 @@ def get_css():
 
         /* ========== SIDEBAR OSCURO ========== */
 
-        /* Sidebar general - Fondo oscuro */
+        /* Sidebar general - Fondo violeta */
         [data-testid="stSidebar"] {
-            background-color: #2D3436 !important;
+            background-color: rgba(78, 50, 173, 0.8) !important;
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3) !important;
         }
 
         [data-testid="stSidebar"] > div:first-child {
-            background-color: #2D3436 !important;
+            background-color: rgba(78, 50, 173, 0.8) !important;
             padding-top: 0.5rem !important;
         }
 
