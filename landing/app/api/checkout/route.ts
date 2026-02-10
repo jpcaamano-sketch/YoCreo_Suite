@@ -16,6 +16,9 @@ export async function POST(req: Request) {
       success_url: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}/exito?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"}`,
       allow_promotion_codes: true,
+      ...(planType === "individual" && {
+        subscription_data: { trial_period_days: 3 },
+      }),
       metadata: {
         planType,
         companyName: companyName || "",
