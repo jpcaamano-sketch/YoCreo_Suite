@@ -42,7 +42,6 @@ export async function POST(request: NextRequest) {
                 customer_id: customerId,
                 subscription_id: subscriptionId,
                 status: "active",
-                max_members: null,
                 seat_count: 1,
               })
               .select()

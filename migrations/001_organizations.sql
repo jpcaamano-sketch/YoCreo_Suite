@@ -9,7 +9,8 @@ CREATE TABLE IF NOT EXISTS organizations (
   customer_id TEXT NOT NULL,
   subscription_id TEXT NOT NULL,
   status TEXT NOT NULL DEFAULT 'active',
-  max_members INTEGER NOT NULL DEFAULT 10,
+  max_members INTEGER DEFAULT 10,
+  seat_count INTEGER DEFAULT 1,
   created_at TIMESTAMPTZ DEFAULT NOW(),
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
