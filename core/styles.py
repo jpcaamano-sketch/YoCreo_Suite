@@ -223,16 +223,18 @@ def get_css():
             font-family: 'Inter', sans-serif;
         }
 
-        /* ========== SIDEBAR OSCURO ========== */
+        /* ========== SIDEBAR VIOLETA ========== */
 
-        /* Sidebar general - Fondo violeta */
-        [data-testid="stSidebar"] {
+        /* Sidebar general - Fondo #4E32AD al 80% */
+        section[data-testid="stSidebar"] {
+            background: rgba(78, 50, 173, 0.8) !important;
             background-color: rgba(78, 50, 173, 0.8) !important;
             box-shadow: 4px 0 15px rgba(0, 0, 0, 0.3) !important;
         }
 
-        [data-testid="stSidebar"] > div:first-child {
-            background-color: rgba(78, 50, 173, 0.8) !important;
+        section[data-testid="stSidebar"] > div {
+            background: transparent !important;
+            background-color: transparent !important;
             padding-top: 0.5rem !important;
         }
 
