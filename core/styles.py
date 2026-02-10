@@ -21,9 +21,9 @@ def get_css():
             font-family: 'Inter', sans-serif !important;
         }
 
-        /* Fondo General: Gris claro */
+        /* Fondo General: Violeta suave */
         .stApp {
-            background-color: #F0F2F6 !important;
+            background-color: rgba(78, 50, 173, 0.2) !important;
         }
 
         /* Ocultar elementos de Streamlit */
