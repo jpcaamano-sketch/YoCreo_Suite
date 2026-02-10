@@ -188,7 +188,12 @@ elif practica_seleccionada == "disculpas_efectivas":
     from practicas.disculpas_efectivas import render
     render()
 elif practica_seleccionada == "admin_panel":
-    from practicas.admin_panel import render
-    render()
+    user_role = st.session_state.get('user_role', {})
+    if user_role.get('tipo') == 'empresa_admin':
+        from practicas.admin_panel import render
+        render()
+    else:
+        seleccionar("introduccion")
+        st.rerun()
 else:
     st.markdown('<div class="custom-warning">Practica no disponible</div>', unsafe_allow_html=True)
