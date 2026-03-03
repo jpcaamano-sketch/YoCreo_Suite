@@ -38,34 +38,17 @@ def verificar_suscripcion(email: str) -> dict:
     try:
         client = get_supabase()
 
-        # Buscar suscripción por email
-        response = client.table('subscriptions').select('*').eq('email', email.lower()).execute()
+        # Verificar si el email existe en sist_personas
+        response = client.table('sist_personas').select('pers_rut, pers_nombres, pers_apellidos').eq('pers_correo', email.lower()).limit(1).execute()
 
         if response.data and len(response.data) > 0:
-            subscription = response.data[0]
-            status = subscription.get('status', 'unknown')
-
-            if status == 'active':
-                return {
-                    'tiene_suscripcion': True,
-                    'status': 'active',
-                    'customer_id': subscription.get('customer_id'),
-                    'message': 'Suscripción activa'
-                }
-            elif status == 'trialing':
-                return {
-                    'tiene_suscripcion': True,
-                    'status': 'trial',
-                    'customer_id': subscription.get('customer_id'),
-                    'message': 'Período de prueba activo'
-                }
-            else:
-                return {
-                    'tiene_suscripcion': False,
-                    'status': status,
-                    'customer_id': subscription.get('customer_id'),
-                    'message': f'Suscripción {status}'
-                }
+            persona = response.data[0]
+            return {
+                'tiene_suscripcion': True,
+                'status': 'active',
+                'customer_id': persona.get('pers_rut'),
+                'message': 'Acceso autorizado'
+            }
         else:
             return {
                 'tiene_suscripcion': False,

@@ -34,32 +34,14 @@ def obtener_rol_usuario(email: str) -> dict:
         supabase = get_supabase()
         email_lower = email.lower()
 
-        # Verificar si es suscriptor individual
-        individual = supabase.table('subscriptions').select('*').eq('email', email_lower).eq('status', 'active').execute()
-        if individual.data:
+        # Verificar si el email existe en sist_personas
+        persona = supabase.table('sist_personas').select('pers_rut').eq('pers_correo', email_lower).limit(1).execute()
+        if persona.data:
             return {
                 'tipo': 'individual',
                 'organization_id': None,
                 'organization_name': None
             }
-
-        # Verificar si es miembro de organización activa
-        member = supabase.table('organization_members').select(
-            '*, organizations(*)'
-        ).eq('email', email_lower).eq('status', 'active').execute()
-
-        if member.data:
-            member_data = member.data[0]
-            org = member_data.get('organizations', {})
-
-            # Verificar que la organización esté activa
-            if org and org.get('status') == 'active':
-                role = member_data.get('role', 'member')
-                return {
-                    'tipo': 'empresa_admin' if role == 'admin' else 'empresa_member',
-                    'organization_id': org.get('id'),
-                    'organization_name': org.get('name')
-                }
 
         return {
             'tipo': None,
