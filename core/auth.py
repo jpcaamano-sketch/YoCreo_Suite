@@ -7,7 +7,7 @@ import logging
 import streamlit as st
 import base64
 import os
-from .database import verificar_suscripcion, obtener_url_suscripcion, get_supabase
+from .database import verificar_suscripcion, obtener_url_suscripcion, get_supabase, obtener_datos_usuario
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ def get_logo_base64():
 
 def obtener_rol_usuario(email: str) -> dict:
     """
-    Retorna información del usuario y su rol.
+    Retorna información del usuario y su rol basado en suite_usuarios.
     Returns: {
         'tipo': 'individual' | 'empresa_admin' | 'empresa_member' | None,
         'organization_id': UUID | None,
@@ -31,31 +31,29 @@ def obtener_rol_usuario(email: str) -> dict:
     }
     """
     try:
-        supabase = get_supabase()
-        email_lower = email.lower()
+        usuario = obtener_datos_usuario(email)
 
-        # Verificar si el email existe en sist_personas
-        persona = supabase.table('sist_personas').select('pers_rut').eq('pers_correo', email_lower).limit(1).execute()
-        if persona.data:
+        if not usuario:
+            return {'tipo': None, 'organization_id': None, 'organization_name': None}
+
+        if usuario.get('rol') == 'administrador':
             return {
-                'tipo': 'individual',
+                'tipo': 'empresa_admin',
                 'organization_id': None,
-                'organization_name': None
+                'organization_name': usuario.get('empresa') or 'YoCreo'
             }
-
-        return {
-            'tipo': None,
-            'organization_id': None,
-            'organization_name': None
-        }
+        elif usuario.get('plan') == 'empresa':
+            return {
+                'tipo': 'empresa_member',
+                'organization_id': None,
+                'organization_name': usuario.get('empresa')
+            }
+        else:
+            return {'tipo': 'individual', 'organization_id': None, 'organization_name': None}
 
     except Exception as e:
         logger.warning("Error obteniendo rol de usuario: %s", e)
-        return {
-            'tipo': None,
-            'organization_id': None,
-            'organization_name': None
-        }
+        return {'tipo': None, 'organization_id': None, 'organization_name': None}
 
 
 def mostrar_login():
@@ -94,10 +92,12 @@ def mostrar_login():
                 rol_usuario = obtener_rol_usuario(email_clean)
 
                 if resultado['tiene_suscripcion'] or rol_usuario['tipo'] is not None:
+                    datos = obtener_datos_usuario(email_clean)
                     st.session_state.user = {
                         'email': email_clean,
                         'status': resultado['status'] if resultado['tiene_suscripcion'] else 'active',
-                        'customer_id': resultado['customer_id']
+                        'customer_id': resultado['customer_id'],
+                        'nombre': datos.get('nombre', '') if datos else ''
                     }
                     st.session_state.user_role = rol_usuario
                     st.session_state.authenticated = True
