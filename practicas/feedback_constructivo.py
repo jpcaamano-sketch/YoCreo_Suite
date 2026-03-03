@@ -50,7 +50,8 @@ Responde EXCLUSIVAMENTE con un JSON valido:
         data = limpiar_json(response)
         if data:
             for key in data:
-                data[key] = data[key].replace("**", "").replace("##", "")
+                if isinstance(data[key], str):
+                    data[key] = data[key].replace("**", "").replace("##", "")
             return data
     return None
 
