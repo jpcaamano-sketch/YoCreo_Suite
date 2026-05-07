@@ -24,76 +24,46 @@ export async function POST(request: NextRequest) {
     switch (event.type) {
 
       // ──────────────────────────────────────────────────────────────────────
-      // Pago completado → activar usuario en suite_usuarios
+      // Pago completado → crear/activar usuario en suite_usuarios
       // ──────────────────────────────────────────────────────────────────────
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
         if (session.mode !== "subscription") break;
 
-        const customerEmail = session.customer_details?.email?.toLowerCase();
-        const customerName  = session.customer_details?.name || "";
-        const customerId    = session.customer as string;
+        const customerEmail  = session.customer_details?.email?.toLowerCase();
+        const customerName   = session.customer_details?.name || "";
+        const customerId     = session.customer as string;
         const subscriptionId = session.subscription as string;
-        const planType      = session.metadata?.planType || "individual";
-        const companyName   = session.metadata?.companyName || "";
+        const planType       = session.metadata?.planType || "individual";
+        const companyName    = session.metadata?.companyName || "";
 
-        if (!customerEmail) break;
+        if (!customerEmail) {
+          console.error("checkout.session.completed: no customer email");
+          break;
+        }
 
-        // ── 1. Tablas antiguas (no tocar) ──────────────────────────────────
         if (planType === "empresa" && companyName) {
-          const { data: orgData, error: orgError } = await supabase
-            .from("organizations")
-            .insert({
-              name: companyName,
-              admin_email: customerEmail,
-              customer_id: customerId,
-              subscription_id: subscriptionId,
-              status: "active",
-              seat_count: 1,
-            })
-            .select()
-            .single();
-
-          if (!orgError && orgData) {
-            await supabase.from("organization_members").insert({
-              organization_id: orgData.id,
-              email: customerEmail,
-              role: "admin",
-              status: "active",
-            });
-
-            // ── 2. suite_usuarios — admin empresa ─────────────────────────
-            await supabase.from("suite_usuarios").upsert(
-              {
-                email:                  customerEmail,
-                nombre:                 customerName || customerEmail.split("@")[0],
-                rol:                    "administrador",
-                plan:                   "empresa",
-                empresa:                companyName,
-                activo:                 true,
-                stripe_customer_id:     customerId,
-                stripe_subscription_id: subscriptionId,
-                organization_id:        orgData.id,
-              },
-              { onConflict: "email" }
-            );
-          } else {
-            console.error("Error creating organization:", orgError);
-          }
+          // Admin empresa
+          const { error } = await supabase.from("suite_usuarios").upsert(
+            {
+              email:                  customerEmail,
+              nombre:                 customerName || customerEmail.split("@")[0],
+              rol:                    "administrador",
+              plan:                   "empresa",
+              empresa:                companyName,
+              activo:                 true,
+              stripe_customer_id:     customerId,
+              stripe_subscription_id: subscriptionId,
+            },
+            { onConflict: "email" }
+          );
+          if (error) console.error("suite_usuarios upsert empresa error:", error);
+          else console.log("suite_usuarios upsert empresa OK:", customerEmail);
 
         } else {
           // Individual
-          await supabase.from("subscriptions").upsert({
-            email:           customerEmail,
-            customer_id:     customerId,
-            subscription_id: subscriptionId,
-            status:          "active",
-            plan_type:       "individual",
-          });
-
-          // ── 2. suite_usuarios — suscriptor individual ──────────────────
-          await supabase.from("suite_usuarios").upsert(
+          const { error } = await supabase.from("suite_usuarios").upsert(
             {
               email:                  customerEmail,
               nombre:                 customerName || customerEmail.split("@")[0],
@@ -105,33 +75,19 @@ export async function POST(request: NextRequest) {
             },
             { onConflict: "email" }
           );
+          if (error) console.error("suite_usuarios upsert individual error:", error);
+          else console.log("suite_usuarios upsert individual OK:", customerEmail);
         }
         break;
       }
 
       // ──────────────────────────────────────────────────────────────────────
-      // Suscripción actualizada (renovación, cambio de plan, reactivación)
+      // Suscripción actualizada (renovación, reactivación)
       // ──────────────────────────────────────────────────────────────────────
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
-        const quantity   = subscription.items.data[0]?.quantity ?? null;
-        const isActive   = ["active", "trialing"].includes(subscription.status);
+        const isActive = ["active", "trialing"].includes(subscription.status);
 
-        await supabase
-          .from("subscriptions")
-          .update({ status: subscription.status, updated_at: new Date().toISOString() })
-          .eq("subscription_id", subscription.id);
-
-        await supabase
-          .from("organizations")
-          .update({
-            status: subscription.status,
-            updated_at: new Date().toISOString(),
-            ...(quantity !== null ? { seat_count: quantity } : {}),
-          })
-          .eq("subscription_id", subscription.id);
-
-        // Sincronizar suite_usuarios
         await supabase
           .from("suite_usuarios")
           .update({ activo: isActive })
@@ -146,17 +102,6 @@ export async function POST(request: NextRequest) {
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
 
-        await supabase
-          .from("subscriptions")
-          .update({ status: "canceled", updated_at: new Date().toISOString() })
-          .eq("subscription_id", subscription.id);
-
-        await supabase
-          .from("organizations")
-          .update({ status: "canceled", updated_at: new Date().toISOString() })
-          .eq("subscription_id", subscription.id);
-
-        // Desactivar en suite_usuarios (admin + todos sus miembros empresa si aplica)
         const { data: adminRow } = await supabase
           .from("suite_usuarios")
           .select("empresa")
@@ -164,7 +109,6 @@ export async function POST(request: NextRequest) {
           .single();
 
         if (adminRow?.empresa) {
-          // Desactivar toda la empresa
           await supabase
             .from("suite_usuarios")
             .update({ activo: false })
@@ -179,7 +123,7 @@ export async function POST(request: NextRequest) {
       }
 
       // ──────────────────────────────────────────────────────────────────────
-      // Pago fallido → marcar como vencido (no desactiva aún)
+      // Pago fallido → desactivar acceso
       // ──────────────────────────────────────────────────────────────────────
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
@@ -193,7 +137,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ received: true });
   } catch (error) {
-    console.error("Webhook error:", error);
+    console.error("Webhook handler error:", error);
     return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
   }
 }
