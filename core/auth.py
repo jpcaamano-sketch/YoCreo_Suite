@@ -123,7 +123,7 @@ def _enviar_otp(email: str, codigo: str) -> bool:
         </div>"""
 
         resend.Emails.send({
-            "from":    "YoCreo Suite <onboarding@resend.dev>",
+            "from":    "YoCreo Suite <noreply@escuelayocreo.cl>",
             "to":      [email],
             "subject": f"YoCreo Suite — Código de acceso: {codigo}",
             "html":    html_body,
@@ -190,7 +190,7 @@ def _enviar_bienvenida(email: str, nombre: str) -> None:
         </div>"""
 
         resend.Emails.send({
-            "from":    "YoCreo Suite <onboarding@resend.dev>",
+            "from":    "YoCreo Suite <noreply@escuelayocreo.cl>",
             "to":      [email],
             "subject": "Bienvenido a YoCreo Suite — Tu plataforma está activa",
             "html":    html_body,
