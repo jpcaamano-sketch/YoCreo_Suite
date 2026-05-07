@@ -10,6 +10,7 @@ from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
 from core.analytics import registrar_uso
+from core.historial import guardar_generacion
 
 
 def limpiar_json(texto):
@@ -131,6 +132,7 @@ OPCION 3: FORMAL (Ultimatum)
                         st.session_state.seg_resultado = resultado
                         st.session_state.seg_ctx = {"compromiso": compromiso, "persona": persona}
                         registrar_uso("seguimiento_compromisos")
+                        guardar_generacion("seguimiento_compromisos", resultado)
                     else:
                         st.markdown('<div class="custom-error">No se pudieron generar los mensajes. Intenta de nuevo.</div>', unsafe_allow_html=True)
             else:

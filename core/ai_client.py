@@ -3,9 +3,15 @@ Cliente de IA para YoCreo Suite
 Protocolo: gemini-2.5-flash
 """
 
+import time
+import logging
 import streamlit as st
 import google.generativeai as genai
 from .config import AI_CONFIG
+
+logger = logging.getLogger(__name__)
+
+_COOLDOWN_SECS = 15  # segundos entre llamadas por usuario
 
 
 def init_ai():
@@ -15,13 +21,29 @@ def init_ai():
         genai.configure(api_key=api_key)
         return True
     except Exception as e:
-        st.markdown(f'''
-            <div class="custom-error">
-                Error al configurar IA: {e}<br>
-                Asegurate de tener GOOGLE_API_KEY en .streamlit/secrets.toml
-            </div>
-        ''', unsafe_allow_html=True)
+        logger.error("Error al configurar IA: %s", e)
+        st.error("No se pudo conectar con el servicio de IA. Contacta al administrador.")
         return False
+
+
+def sanitize_input(texto: str, max_len: int = 600) -> str:
+    """Trunca el input a max_len caracteres para prevenir inyección de prompts."""
+    if not texto:
+        return ""
+    return str(texto)[:max_len]
+
+
+def _check_rate_limit() -> bool:
+    """Verifica cooldown entre llamadas. Retorna True si se puede proceder."""
+    now = time.time()
+    last_call = st.session_state.get("_ai_last_call", 0)
+    elapsed = now - last_call
+    if elapsed < _COOLDOWN_SECS:
+        remaining = int(_COOLDOWN_SECS - elapsed) + 1
+        st.warning(f"Espera {remaining} segundo(s) antes de la próxima consulta.")
+        return False
+    st.session_state["_ai_last_call"] = now
+    return True
 
 
 def generate_response(prompt, max_tokens=None):
@@ -35,6 +57,8 @@ def generate_response(prompt, max_tokens=None):
     Returns:
         str: Texto de respuesta o None si hay error
     """
+    if not _check_rate_limit():
+        return None
     try:
         tokens = max_tokens or AI_CONFIG.get("max_tokens", 8192)
         generation_config = genai.types.GenerationConfig(
@@ -44,11 +68,8 @@ def generate_response(prompt, max_tokens=None):
         response = model.generate_content(prompt, generation_config=generation_config)
         return response.text
     except Exception as e:
-        st.markdown(f'''
-            <div class="custom-error">
-                Error al generar respuesta: {e}
-            </div>
-        ''', unsafe_allow_html=True)
+        logger.error("Error al generar respuesta: %s", e)
+        st.error("No se pudo generar la respuesta. Intenta de nuevo en unos segundos.")
         return None
 
 

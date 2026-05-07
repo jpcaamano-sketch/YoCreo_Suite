@@ -1,6 +1,17 @@
 """
 Conexión a Supabase para YoCreo Suite
 Gestiona usuarios via tabla suite_usuarios
+
+-- SQL tabla logos empresa (ejecutar en Supabase SQL Editor):
+CREATE TABLE IF NOT EXISTS suite_empresa_config (
+    id          BIGSERIAL   PRIMARY KEY,
+    empresa     TEXT        NOT NULL UNIQUE,
+    logo_b64    TEXT,
+    updated_at  TIMESTAMPTZ DEFAULT NOW()
+);
+ALTER TABLE suite_empresa_config ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "anon_all_empresa_config" ON suite_empresa_config
+    FOR ALL TO anon USING (true) WITH CHECK (true);
 """
 
 import logging
@@ -31,7 +42,8 @@ def obtener_datos_usuario(email: str) -> dict | None:
     try:
         client = get_supabase()
         response = client.table('suite_usuarios').select(
-            'id, nombre, email, rol, plan, empresa, activo'
+            'id, nombre, email, rol, plan, empresa, activo, '
+            'stripe_customer_id, stripe_subscription_id, organization_id'
         ).eq('email', email.lower()).eq('activo', True).limit(1).execute()
 
         if response.data and len(response.data) > 0:
@@ -85,6 +97,37 @@ def verificar_suscripcion(email: str) -> dict:
 def obtener_url_suscripcion() -> str:
     """Retorna la URL del landing para suscribirse"""
     return st.secrets.get("LANDING_URL", "https://yocreo-landing.vercel.app")
+
+
+def get_empresa_config(empresa: str) -> dict | None:
+    """Retorna la configuración de la empresa (logo_b64, etc.) o None si no existe."""
+    try:
+        client = get_supabase()
+        resp = (
+            client.table('suite_empresa_config')
+            .select('empresa, logo_b64')
+            .eq('empresa', empresa)
+            .limit(1)
+            .execute()
+        )
+        return resp.data[0] if resp.data else None
+    except Exception as e:
+        logger.warning("No se pudo obtener config empresa: %s", e)
+        return None
+
+
+def save_empresa_logo(empresa: str, logo_b64: str) -> bool:
+    """Guarda o actualiza el logo de la empresa. Retorna True si tuvo éxito."""
+    try:
+        client = get_supabase()
+        client.table('suite_empresa_config').upsert(
+            {'empresa': empresa, 'logo_b64': logo_b64},
+            on_conflict='empresa'
+        ).execute()
+        return True
+    except Exception as e:
+        logger.warning("No se pudo guardar logo empresa: %s", e)
+        return False
 
 
 def registrar_uso_practica(email: str, practice_key: str, organization_id: str = None):

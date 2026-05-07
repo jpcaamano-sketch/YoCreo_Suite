@@ -12,9 +12,10 @@ import base64
 import streamlit as st
 import streamlit.components.v1 as components
 from reportlab.lib.pagesizes import letter
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image as RLImage
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib import colors
 from docx import Document
 from core.config import ICONOS_SVG
 
@@ -179,7 +180,8 @@ def text_area_with_copy(label, text, key, height=300):
 
 def create_pdf_reportlab(titulo, secciones):
     """
-    Crea un documento PDF profesional con reportlab en memoria
+    Crea un documento PDF profesional con reportlab en memoria.
+    Si st.session_state.empresa_logo existe (base64), lo incluye como cabecera.
 
     Args:
         titulo: Titulo del documento
@@ -208,7 +210,7 @@ def create_pdf_reportlab(titulo, secciones):
         'CustomHeading',
         parent=styles['Heading2'],
         fontSize=14,
-        textColor='#4E32AD',
+        textColor=colors.HexColor('#4E32AD'),
         spaceAfter=10
     )
 
@@ -220,6 +222,19 @@ def create_pdf_reportlab(titulo, secciones):
         leading=14,
         alignment=TA_LEFT
     )
+
+    # Logo de empresa (marca blanca) — si existe en sesión
+    try:
+        logo_b64 = st.session_state.get('empresa_logo')
+        if logo_b64:
+            img_data = base64.b64decode(logo_b64)
+            img_buf  = io.BytesIO(img_data)
+            logo_img = RLImage(img_buf, width=90, height=45, kind='proportional')
+            logo_img.hAlign = 'LEFT'
+            elements.append(logo_img)
+            elements.append(Spacer(1, 12))
+    except Exception:
+        pass  # Continuar sin logo si falla
 
     # Titulo principal
     elements.append(Paragraph(titulo, title_style))

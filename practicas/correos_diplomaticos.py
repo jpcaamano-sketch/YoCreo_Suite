@@ -10,6 +10,7 @@ from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
 from core.analytics import registrar_uso
+from core.historial import guardar_generacion
 
 
 def limpiar_json(texto):
@@ -122,6 +123,7 @@ def render():
 
 --- VERSION COLOQUIAL ---
 {data['coloquial']}"""
+                        guardar_generacion("correos_diplomaticos", resultado)
                         st.session_state.mail_resultado = resultado
                     else:
                         st.markdown('<div class="custom-error">No se pudieron generar las propuestas. Intenta de nuevo.</div>', unsafe_allow_html=True)

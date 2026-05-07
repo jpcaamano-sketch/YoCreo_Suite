@@ -29,15 +29,26 @@ def get_css():
         /* Ocultar elementos de Streamlit */
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
-        header {display: none !important;}
+
+        /* Header: fondo transparente para que desaparezca visualmente
+           sin romper el botón colapsar/expandir del sidebar */
+        header[data-testid="stHeader"] {
+            background-color: transparent !important;
+            background: transparent !important;
+            border-bottom: none !important;
+            box-shadow: none !important;
+        }
+
+        /* Ocultar solo el botón Deploy — NO ocultar stToolbarActions completo
+           porque contiene el botón expandir sidebar cuando está colapsado */
+        [data-testid="stDeployButton"]   {display: none !important;}
+        [data-testid="stStatusWidget"]   {display: none !important;}
+        [data-testid="stDecoration"]     {display: none !important;}
 
         /* Ocultar "Press Enter to submit form" */
         [data-testid="InputInstructions"] {
             display: none !important;
         }
-
-        /* Ocultar boton X del sidebar */
-        [data-testid="stSidebar"] [data-testid="stSidebarCollapseButton"] {display: none !important;}
 
         /* Espaciado del contenedor principal */
         .block-container {
@@ -251,7 +262,7 @@ def get_css():
         .sidebar-logo {
             text-align: left;
             padding: 0 0 35px 16px;
-            margin-top: -10px;
+            margin-top: 8px;
         }
 
         .sidebar-logo img {
@@ -400,6 +411,32 @@ def get_css():
     """
 
 
+def get_hide_deploy_script():
+    """Elimina el botón Deploy por JS (respaldo del CSS). Solo oculta el botón, nunca el contenedor."""
+    return """
+    <script>
+        function hideDeployBtn() {
+            var doc = window.parent.document;
+            // Por testid específico del botón Deploy
+            var deployBtn = doc.querySelector('[data-testid="stDeployButton"]');
+            if (deployBtn) deployBtn.style.display = 'none';
+            // Por texto del botón — solo ocultar el botón mismo, NO su padre
+            doc.querySelectorAll('button').forEach(function(btn) {
+                if (btn.innerText && btn.innerText.trim().toLowerCase() === 'deploy') {
+                    btn.style.display = 'none';
+                }
+            });
+        }
+        hideDeployBtn();
+        setTimeout(hideDeployBtn, 500);
+        setTimeout(hideDeployBtn, 1500);
+        new MutationObserver(hideDeployBtn).observe(
+            window.parent.document.body, {childList: true, subtree: true}
+        );
+    </script>
+    """
+
+
 def get_anti_autocomplete_script():
     """Retorna script JS para desactivar autocompletado"""
     return """
@@ -443,6 +480,7 @@ def get_remember_page_script():
 def apply_styles(st):
     """Aplica los estilos CSS y scripts"""
     st.markdown(get_css(), unsafe_allow_html=True)
+    components.html(get_hide_deploy_script(), height=0, width=0)
     components.html(get_anti_autocomplete_script(), height=0, width=0)
     components.html(get_remember_page_script(), height=0, width=0)
 

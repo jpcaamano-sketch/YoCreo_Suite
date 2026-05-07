@@ -107,6 +107,11 @@ with st.sidebar:
             seleccionar("admin_panel")
             st.rerun()
 
+    # Mi Historial
+    if st.button("Mi Historial", key="b_historial", use_container_width=True):
+        seleccionar("historial")
+        st.rerun()
+
     # Cerrar sesión
     if st.button("Cerrar sesión", key="b_logout", use_container_width=True):
         cerrar_sesion()
@@ -186,6 +191,9 @@ elif practica_seleccionada == "definicion_objetivos":
     render()
 elif practica_seleccionada == "disculpas_efectivas":
     from practicas.disculpas_efectivas import render
+    render()
+elif practica_seleccionada == "historial":
+    from practicas.historial import render
     render()
 elif practica_seleccionada == "admin_panel":
     user_role = st.session_state.get('user_role', {})

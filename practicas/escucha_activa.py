@@ -11,6 +11,7 @@ from core.config import PRACTICAS
 from core.ai_client import generate_response
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
 from core.analytics import registrar_uso
+from core.historial import guardar_generacion
 
 
 def limpiar_json(texto):
@@ -64,12 +65,13 @@ REGLAS DE FORMATO:
 
 Responde EXCLUSIVAMENTE con un JSON valido:
 {{
-    "consejo_detectado": true/false,
-    "puntaje": (Numero del 1 al 10),
+    "intensidad_consejo": 0,
+    "puntaje": 0,
     "feedback_positivo": "Lo que hizo bien...",
     "feedback_mejora": "Lo que le falto...",
     "ejemplo_ideal": "Respuesta perfecta de Reflective Listening"
-}}"""
+}}
+Donde intensidad_consejo es: 0 = pura escucha / 1 = parcialmente consejo / 2 = puro consejo"""
     response = generate_response(prompt)
     if response:
         return limpiar_json(response)
@@ -148,6 +150,9 @@ def render():
                         st.session_state.escucha_evaluacion = evaluacion
 
                         if evaluacion:
+                            # Compatibilidad: si viene consejo_detectado antiguo, convertirlo
+                            if 'consejo_detectado' in evaluacion and 'intensidad_consejo' not in evaluacion:
+                                evaluacion['intensidad_consejo'] = 2 if evaluacion['consejo_detectado'] else 0
                             st.session_state.escucha_historial.insert(0, {
                                 "personaje": caso.get('nombre', 'Persona'),
                                 "monologo": monologo[:50] + "...",
@@ -166,11 +171,15 @@ def render():
             st.markdown("#### Veredicto del Coach")
 
             score = ev.get('puntaje', 0)
+            intensidad = ev.get('intensidad_consejo', 0)
 
-            if ev.get('consejo_detectado'):
-                st.markdown('<div class="custom-error">ALERTA: Intentaste dar un consejo. En la escucha activa pura, primero debemos validar.</div>', unsafe_allow_html=True)
+            if intensidad == 2:
+                st.markdown('<div class="custom-error">ALERTA: Respuesta de puro consejo. En la escucha activa primero debemos validar la emoción.</div>', unsafe_allow_html=True)
+            elif intensidad == 1:
+                st.warning("Parcialmente consejo: detectamos una sugerencia implícita. Intenta enfocarte solo en validar y parafrasear.")
 
-            resultado_texto = f"""PUNTAJE: {score}/10
+            _intensidad_label = {0: "Pura escucha", 1: "Parcialmente consejo", 2: "Puro consejo"}.get(intensidad, "—")
+            resultado_texto = f"""PUNTAJE: {score}/10 | INTENSIDAD CONSEJO: {_intensidad_label}
 
 LO BUENO:
 {ev.get('feedback_positivo', '')}
@@ -180,6 +189,8 @@ A MEJORAR:
 
 RESPUESTA IDEAL:
 {ev.get('ejemplo_ideal', '')}"""
+
+            guardar_generacion("escucha_activa", resultado_texto)
 
             st.session_state.escucha_resultado_texto = st.text_area(
                 "Evaluacion editable:",

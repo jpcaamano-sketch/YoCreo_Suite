@@ -22,68 +22,104 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
+
+      // ──────────────────────────────────────────────────────────────────────
+      // Pago completado → activar usuario en suite_usuarios
+      // ──────────────────────────────────────────────────────────────────────
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
 
-        if (session.mode === "subscription") {
-          const customerEmail =
-            session.customer_details?.email?.toLowerCase();
-          const customerId = session.customer as string;
-          const subscriptionId = session.subscription as string;
-          const planType = session.metadata?.planType || "individual";
-          const companyName = session.metadata?.companyName || "";
+        if (session.mode !== "subscription") break;
 
-          if (planType === "empresa" && companyName) {
-            const { data: orgData, error: orgError } = await supabase
-              .from("organizations")
-              .insert({
-                name: companyName,
-                admin_email: customerEmail,
-                customer_id: customerId,
-                subscription_id: subscriptionId,
-                status: "active",
-                seat_count: 1,
-              })
-              .select()
-              .single();
+        const customerEmail = session.customer_details?.email?.toLowerCase();
+        const customerName  = session.customer_details?.name || "";
+        const customerId    = session.customer as string;
+        const subscriptionId = session.subscription as string;
+        const planType      = session.metadata?.planType || "individual";
+        const companyName   = session.metadata?.companyName || "";
 
-            if (orgError) {
-              console.error("Error creating organization:", orgError);
-            } else {
-              await supabase.from("organization_members").insert({
-                organization_id: orgData.id,
-                email: customerEmail,
-                role: "admin",
-                status: "active",
-              });
-            }
-          } else {
-            const { error } = await supabase.from("subscriptions").upsert({
-              email: customerEmail,
+        if (!customerEmail) break;
+
+        // ── 1. Tablas antiguas (no tocar) ──────────────────────────────────
+        if (planType === "empresa" && companyName) {
+          const { data: orgData, error: orgError } = await supabase
+            .from("organizations")
+            .insert({
+              name: companyName,
+              admin_email: customerEmail,
               customer_id: customerId,
               subscription_id: subscriptionId,
               status: "active",
-              plan_type: "individual",
+              seat_count: 1,
+            })
+            .select()
+            .single();
+
+          if (!orgError && orgData) {
+            await supabase.from("organization_members").insert({
+              organization_id: orgData.id,
+              email: customerEmail,
+              role: "admin",
+              status: "active",
             });
 
-            if (error) {
-              console.error("Error saving subscription:", error);
-            }
+            // ── 2. suite_usuarios — admin empresa ─────────────────────────
+            await supabase.from("suite_usuarios").upsert(
+              {
+                email:                  customerEmail,
+                nombre:                 customerName || customerEmail.split("@")[0],
+                rol:                    "administrador",
+                plan:                   "empresa",
+                empresa:                companyName,
+                activo:                 true,
+                stripe_customer_id:     customerId,
+                stripe_subscription_id: subscriptionId,
+                organization_id:        orgData.id,
+              },
+              { onConflict: "email" }
+            );
+          } else {
+            console.error("Error creating organization:", orgError);
           }
+
+        } else {
+          // Individual
+          await supabase.from("subscriptions").upsert({
+            email:           customerEmail,
+            customer_id:     customerId,
+            subscription_id: subscriptionId,
+            status:          "active",
+            plan_type:       "individual",
+          });
+
+          // ── 2. suite_usuarios — suscriptor individual ──────────────────
+          await supabase.from("suite_usuarios").upsert(
+            {
+              email:                  customerEmail,
+              nombre:                 customerName || customerEmail.split("@")[0],
+              rol:                    "suscrito",
+              plan:                   "individual",
+              activo:                 true,
+              stripe_customer_id:     customerId,
+              stripe_subscription_id: subscriptionId,
+            },
+            { onConflict: "email" }
+          );
         }
         break;
       }
 
+      // ──────────────────────────────────────────────────────────────────────
+      // Suscripción actualizada (renovación, cambio de plan, reactivación)
+      // ──────────────────────────────────────────────────────────────────────
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
-        const quantity = subscription.items.data[0]?.quantity ?? null;
+        const quantity   = subscription.items.data[0]?.quantity ?? null;
+        const isActive   = ["active", "trialing"].includes(subscription.status);
 
         await supabase
           .from("subscriptions")
-          .update({
-            status: subscription.status,
-            updated_at: new Date().toISOString(),
-          })
+          .update({ status: subscription.status, updated_at: new Date().toISOString() })
           .eq("subscription_id", subscription.id);
 
         await supabase
@@ -94,27 +130,63 @@ export async function POST(request: NextRequest) {
             ...(quantity !== null ? { seat_count: quantity } : {}),
           })
           .eq("subscription_id", subscription.id);
+
+        // Sincronizar suite_usuarios
+        await supabase
+          .from("suite_usuarios")
+          .update({ activo: isActive })
+          .eq("stripe_subscription_id", subscription.id);
+
         break;
       }
 
+      // ──────────────────────────────────────────────────────────────────────
+      // Suscripción cancelada → desactivar acceso
+      // ──────────────────────────────────────────────────────────────────────
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
 
         await supabase
           .from("subscriptions")
-          .update({
-            status: "canceled",
-            updated_at: new Date().toISOString(),
-          })
+          .update({ status: "canceled", updated_at: new Date().toISOString() })
           .eq("subscription_id", subscription.id);
 
         await supabase
           .from("organizations")
-          .update({
-            status: "canceled",
-            updated_at: new Date().toISOString(),
-          })
+          .update({ status: "canceled", updated_at: new Date().toISOString() })
           .eq("subscription_id", subscription.id);
+
+        // Desactivar en suite_usuarios (admin + todos sus miembros empresa si aplica)
+        const { data: adminRow } = await supabase
+          .from("suite_usuarios")
+          .select("empresa")
+          .eq("stripe_subscription_id", subscription.id)
+          .single();
+
+        if (adminRow?.empresa) {
+          // Desactivar toda la empresa
+          await supabase
+            .from("suite_usuarios")
+            .update({ activo: false })
+            .eq("empresa", adminRow.empresa);
+        } else {
+          await supabase
+            .from("suite_usuarios")
+            .update({ activo: false })
+            .eq("stripe_subscription_id", subscription.id);
+        }
+        break;
+      }
+
+      // ──────────────────────────────────────────────────────────────────────
+      // Pago fallido → marcar como vencido (no desactiva aún)
+      // ──────────────────────────────────────────────────────────────────────
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        await supabase
+          .from("suite_usuarios")
+          .update({ activo: false })
+          .eq("stripe_customer_id", invoice.customer as string);
         break;
       }
     }
@@ -122,9 +194,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Webhook error:", error);
-    return NextResponse.json(
-      { error: "Webhook handler failed" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Webhook handler failed" }, { status: 500 });
   }
 }
