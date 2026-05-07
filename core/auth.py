@@ -1,14 +1,11 @@
 """
 Sistema de autenticación para YoCreo Suite
-Verificación en dos pasos: email → código OTP enviado por Gmail SMTP
+Verificación en dos pasos: email → código OTP enviado por Resend
 """
 
 import logging
 import random
 import time
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 import streamlit as st
 import streamlit.components.v1 as components
 import base64
@@ -107,21 +104,15 @@ def _generar_codigo() -> str:
 
 
 def _enviar_otp(email: str, codigo: str) -> bool:
-    """Envía el código OTP por Gmail SMTP. Retorna True si tuvo éxito."""
+    """Envía el código OTP vía Resend. Retorna True si tuvo éxito."""
     try:
-        smtp_user = st.secrets.get("SMTP_USER", "")
-        smtp_pass = st.secrets.get("SMTP_PASSWORD", "")
-        if not smtp_user or not smtp_pass:
-            logger.error("Credenciales SMTP no configuradas en secrets.toml")
+        import resend
+        resend.api_key = st.secrets.get("RESEND_API_KEY", "")
+        if not resend.api_key:
+            logger.error("RESEND_API_KEY no configurada en secrets.toml")
             return False
 
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = f"YoCreo Suite — Código de acceso: {codigo}"
-        msg["From"]    = smtp_user
-        msg["To"]      = email
-
-        texto_plano = f"Tu código de acceso a YoCreo Suite es: {codigo}\n\nExpira en 10 minutos. Si no lo solicitaste, ignora este correo."
-        html_body   = f"""
+        html_body = f"""
         <div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;padding:32px;">
           <h2 style="color:#4E32AD;margin-bottom:8px;">YoCreo Suite</h2>
           <p style="color:#555;margin-bottom:24px;">Tu código de acceso:</p>
@@ -131,13 +122,12 @@ def _enviar_otp(email: str, codigo: str) -> bool:
           <p style="color:#888;font-size:13px;">Expira en 10 minutos.<br>Si no lo solicitaste, ignora este correo.</p>
         </div>"""
 
-        msg.attach(MIMEText(texto_plano, "plain"))
-        msg.attach(MIMEText(html_body,   "html"))
-
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.send_message(msg)
+        resend.Emails.send({
+            "from":    "YoCreo Suite <noreply@yocreo.cl>",
+            "to":      [email],
+            "subject": f"YoCreo Suite — Código de acceso: {codigo}",
+            "html":    html_body,
+        })
         return True
     except Exception as e:
         logger.error("Error enviando OTP a %s: %s", email, e)
@@ -145,32 +135,16 @@ def _enviar_otp(email: str, codigo: str) -> bool:
 
 
 def _enviar_bienvenida(email: str, nombre: str) -> None:
-    """Envía email de bienvenida al primer login. Falla silenciosamente."""
+    """Envía email de bienvenida al primer login vía Resend. Falla silenciosamente."""
     try:
-        smtp_user = st.secrets.get("SMTP_USER", "")
-        smtp_pass = st.secrets.get("SMTP_PASSWORD", "")
-        if not smtp_user or not smtp_pass:
+        import resend
+        resend.api_key = st.secrets.get("RESEND_API_KEY", "")
+        if not resend.api_key:
             return
 
-        landing_url = st.secrets.get("LANDING_URL", "https://yocreo-landing.vercel.app")
+        landing_url    = st.secrets.get("LANDING_URL", "https://yocreo-landing.vercel.app")
         nombre_display = nombre.split()[0].capitalize() if nombre else "Líder"
 
-        msg = MIMEMultipart("alternative")
-        msg["Subject"] = "Bienvenido a YoCreo Suite — Tu plataforma está activa"
-        msg["From"]    = smtp_user
-        msg["To"]      = email
-
-        texto_plano = (
-            f"Hola {nombre_display},\n\n"
-            "Tu acceso a YoCreo Suite está activo.\n\n"
-            "Tienes disponibles 14 prácticas de liderazgo organizadas en 4 categorías:\n"
-            "  1. Autogestión y Foco\n"
-            "  2. Coordinación Impecable\n"
-            "  3. Desarrollo de Otros\n"
-            "  4. Estrategia y Relaciones\n\n"
-            "Ingresa cuando quieras en: https://yocreo-landing.vercel.app\n\n"
-            "— El equipo YoCreo"
-        )
         html_body = f"""
         <div style="font-family:Arial,sans-serif;max-width:580px;margin:0 auto;padding:32px;">
           <h2 style="color:#4E32AD;margin-bottom:4px;">YoCreo Suite</h2>
@@ -205,10 +179,8 @@ def _enviar_bienvenida(email: str, nombre: str) -> None:
             </tr>
           </table>
           <div style="text-align:center;margin:30px 0;">
-            <a href="{landing_url}" style="
-              background:#FF6B4E;color:#fff;
-              padding:14px 32px;border-radius:10px;
-              text-decoration:none;font-weight:700;font-size:15px;">
+            <a href="{landing_url}" style="background:#FF6B4E;color:#fff;padding:14px 32px;
+              border-radius:10px;text-decoration:none;font-weight:700;font-size:15px;">
               Ir a la plataforma →
             </a>
           </div>
@@ -217,13 +189,12 @@ def _enviar_bienvenida(email: str, nombre: str) -> None:
           </p>
         </div>"""
 
-        msg.attach(MIMEText(texto_plano, "plain"))
-        msg.attach(MIMEText(html_body,   "html"))
-
-        with smtplib.SMTP("smtp.gmail.com", 587, timeout=15) as server:
-            server.starttls()
-            server.login(smtp_user, smtp_pass)
-            server.send_message(msg)
+        resend.Emails.send({
+            "from":    "YoCreo Suite <noreply@yocreo.cl>",
+            "to":      [email],
+            "subject": "Bienvenido a YoCreo Suite — Tu plataforma está activa",
+            "html":    html_body,
+        })
     except Exception as e:
         logger.warning("No se pudo enviar email de bienvenida a %s: %s", email, e)
 
