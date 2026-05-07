@@ -1,11 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripe } from "@/lib/stripe";
-import { getSupabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
+
+// Usa service role key para bypass de RLS en operaciones del webhook
+function getAdminSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
 
 export async function POST(request: NextRequest) {
   const stripe = getStripe();
-  const supabase = getSupabase();
+  const supabase = getAdminSupabase();
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!;
 
   const body = await request.text();
