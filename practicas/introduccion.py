@@ -249,7 +249,7 @@ def _bloque_hero(nombre: str, datos: dict):
 
     # Hero — solo HTML visual, sin botones ocultos
     st.markdown(f"""
-<div style="background:linear-gradient(135deg,#3C3489 0%,#534AB7 100%);
+<div style="background:linear-gradient(135deg,#4E32AD 0%,#6B50D4 100%);
             border-radius:16px 16px 0 0;padding:36px 32px 28px 32px;color:white;
             position:relative;overflow:hidden;">
     <div style="position:absolute;width:220px;height:220px;border-radius:50%;
@@ -288,15 +288,15 @@ div[data-testid="stButton"]:has(button[data-testid="baseButton-primary"]) {
 }
 div[data-testid="stButton"]:has(button[data-testid="baseButton-primary"]) button {
     border-radius: 0 0 16px 16px !important;
-    background: #534AB7 !important;
-    border-color: #534AB7 !important;
+    background: #4E32AD !important;
+    border-color: #4E32AD !important;
     color: white !important;
     font-weight: 600 !important;
     padding: 14px !important;
 }
 div[data-testid="stButton"]:has(button[data-testid="baseButton-primary"]) button:hover {
-    background: #4A3DA8 !important;
-    border-color: #4A3DA8 !important;
+    background: #3C2690 !important;
+    border-color: #3C2690 !important;
 }
 </style>
 """, unsafe_allow_html=True)
