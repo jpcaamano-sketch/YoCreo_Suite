@@ -107,6 +107,11 @@ with st.sidebar:
             seleccionar("admin_panel")
             st.rerun()
 
+    # Mi Avance
+    if st.button("Mi Avance", key="b_panel_avance", use_container_width=True):
+        seleccionar("panel_avance")
+        st.rerun()
+
     # Mi Historial
     if st.button("Mi Historial", key="b_historial", use_container_width=True):
         seleccionar("historial")
@@ -191,6 +196,9 @@ elif practica_seleccionada == "definicion_objetivos":
     render()
 elif practica_seleccionada == "disculpas_efectivas":
     from practicas.disculpas_efectivas import render
+    render()
+elif practica_seleccionada == "panel_avance":
+    from practicas.panel_avance import render
     render()
 elif practica_seleccionada == "historial":
     from practicas.historial import render
