@@ -1,12 +1,147 @@
 """
-Introduccion - YoCreo Suite
-Protocolo Estandar v2.0
+Introduccion - YoCreo Suite (rediseño v2)
+Página de inicio personalizada con datos reales del usuario.
 """
 
 import streamlit as st
 import streamlit.components.v1 as components
+from collections import Counter
+from datetime import datetime, timezone, timedelta
 from core.config import PRACTICAS
 
+
+# ── Dimensiones para esta página ─────────────────────────────────────────────
+
+DIMENSIONES_INTRO = {
+    "Autogestión y Foco": {
+        "num": "01", "icon": "🛡️", "bg": "#EEEDFE",
+        "practicas": ["priorizador_tareas", "presentacion_inspiradora"],
+    },
+    "Coordinación Impecable": {
+        "num": "02", "icon": "⚡", "bg": "#FAEEDA",
+        "practicas": ["pedidos_impecables", "delegacion_situacional",
+                      "correos_diplomaticos", "seguimiento_compromisos"],
+    },
+    "Desarrollo de Otros": {
+        "num": "03", "icon": "🌱", "bg": "#E1F5EE",
+        "practicas": ["escucha_activa", "preguntas_desafiantes",
+                      "feedback_constructivo", "evaluacion_desempeno"],
+    },
+    "Estrategia y Relaciones": {
+        "num": "04", "icon": "🎯", "bg": "#FAECE7",
+        "practicas": ["definicion_objetivos", "planificador_reuniones",
+                      "negociador_harvard", "disculpas_efectivas"],
+    },
+}
+
+PRACTICAS_CORTOS = {
+    "priorizador_tareas":       "Priorizador",
+    "planificador_reuniones":   "Reuniones",
+    "pedidos_impecables":       "Pedidos",
+    "delegacion_situacional":   "Delegación",
+    "correos_diplomaticos":     "Mensajes",
+    "seguimiento_compromisos":  "Compromisos",
+    "escucha_activa":           "Escucha Activa",
+    "feedback_constructivo":    "Feedback",
+    "evaluacion_desempeno":     "Evaluación",
+    "negociador_harvard":       "Negociador",
+    "presentacion_inspiradora": "Presentación",
+    "preguntas_desafiantes":    "Preguntas",
+    "definicion_objetivos":     "Objetivos",
+    "disculpas_efectivas":      "Disculpas",
+}
+
+TODAS_LAS_PRACTICAS = list(PRACTICAS_CORTOS.keys())
+
+
+# ── Carga de datos ────────────────────────────────────────────────────────────
+
+def _cargar_datos(email: str) -> dict:
+    """Carga eventos desde Supabase o reutiliza cache de session_state."""
+    from core.database import get_supabase
+
+    cache_key = "_panel_eventos"
+    if cache_key not in st.session_state:
+        try:
+            supabase = get_supabase()
+            resp = (
+                supabase.table("practice_events")
+                .select("practice_key, created_at")
+                .eq("email", email.lower())
+                .order("created_at", desc=False)
+                .execute()
+            )
+            eventos = resp.data if resp.data else []
+        except Exception:
+            eventos = []
+        st.session_state[cache_key] = eventos
+        st.session_state["_panel_racha"] = _calcular_racha(eventos)
+
+    eventos = st.session_state[cache_key]
+    racha   = st.session_state.get("_panel_racha", 0)
+    conteo  = Counter(e["practice_key"] for e in eventos)
+    total   = len(eventos)
+    activas = sum(1 for k in TODAS_LAS_PRACTICAS if conteo[k] > 0)
+
+    # Zona ciega: dimensión con menor % de prácticas usadas
+    zona_ciega = None
+    if total > 0:
+        pct_dims = {}
+        for nombre, datos in DIMENSIONES_INTRO.items():
+            usadas = sum(1 for p in datos["practicas"] if conteo[p] > 0)
+            pct_dims[nombre] = usadas / len(datos["practicas"])
+        zona_ciega = min(pct_dims, key=pct_dims.get)
+
+    # Eventos recientes para accesos rápidos
+    eventos_desc = sorted(eventos, key=lambda e: e["created_at"], reverse=True)
+
+    return {
+        "total":   total,
+        "activas": activas,
+        "racha":   racha,
+        "conteo":  conteo,
+        "zona_ciega":   zona_ciega,
+        "eventos_desc": eventos_desc,
+    }
+
+
+def _calcular_racha(eventos: list) -> int:
+    if not eventos:
+        return 0
+    fechas = set()
+    for e in eventos:
+        try:
+            dt = datetime.fromisoformat(e["created_at"].replace("Z", "+00:00"))
+            fechas.add(dt.date())
+        except Exception:
+            pass
+    hoy  = datetime.now(timezone.utc).date()
+    ayer = hoy - timedelta(days=1)
+    inicio = hoy if hoy in fechas else (ayer if ayer in fechas else None)
+    if not inicio:
+        return 0
+    racha, dia = 0, inicio
+    while dia in fechas:
+        racha += 1
+        dia -= timedelta(days=1)
+    return racha
+
+
+def _hace_n_dias(iso_str: str) -> str:
+    try:
+        dt   = datetime.fromisoformat(iso_str.replace("Z", "+00:00"))
+        diff = datetime.now(timezone.utc) - dt
+        d    = diff.days
+        if d == 0:   return "hoy"
+        if d == 1:   return "ayer"
+        if d < 30:   return f"hace {d} días"
+        if d < 365:  return f"hace {d // 30} mes(es)"
+        return f"hace {d // 365} año(s)"
+    except Exception:
+        return ""
+
+
+# ── Tour de onboarding ────────────────────────────────────────────────────────
 
 def _mostrar_onboarding_tour():
     """Muestra un tour de bienvenida la primera vez (rastreado en localStorage)."""
@@ -88,58 +223,271 @@ def _mostrar_onboarding_tour():
 """, height=0)
 
 
-def render():
-    """Renderiza la introduccion de la Suite."""
-    info = PRACTICAS["introduccion"]
+# ── Bloque 1: Hero personalizado ──────────────────────────────────────────────
 
-    # Tour de bienvenida para nuevos usuarios (se muestra una sola vez)
+def _bloque_hero(nombre: str, datos: dict):
+    total   = datos["total"]
+    activas = datos["activas"]
+    racha   = datos["racha"]
+    zona_ciega = datos.get("zona_ciega")
+
+    nombre_display = nombre.split()[0].capitalize() if nombre else "Líder"
+
+    if total == 0:
+        subtitulo = "Comienza hoy tu camino de liderazgo consciente. Todas las prácticas te esperan."
+    elif racha >= 2:
+        sufijo = f"Tu zona ciega: <strong>{zona_ciega}</strong>." if zona_ciega else ""
+        subtitulo = f"Llevas <strong>{racha} días</strong> consecutivos practicando. {sufijo}"
+    elif racha == 1:
+        sufijo = f"Tu zona ciega: <strong>{zona_ciega}</strong>." if zona_ciega else ""
+        subtitulo = f"Hoy volviste a practicar. {sufijo}"
+    else:
+        sufijo = f"Tu zona ciega: <strong>{zona_ciega}</strong>." if zona_ciega else ""
+        subtitulo = f"Es un buen momento para retomar el ritmo. {sufijo}"
+
+    st.markdown(f"""
+<div style="background:linear-gradient(135deg,#3C3489 0%,#534AB7 100%);
+            border-radius:16px;padding:32px 28px 28px 28px;color:white;margin-bottom:4px;">
+    <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
+                opacity:0.7;margin-bottom:8px;">Bienvenido de vuelta</div>
+    <div style="font-size:28px;font-weight:800;margin-bottom:10px;">Hola, {nombre_display} 👋</div>
+    <div style="font-size:14px;opacity:0.85;line-height:1.6;margin-bottom:24px;">{subtitulo}</div>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.2);margin:0 0 20px 0;">
+    <div style="display:flex;gap:0;">
+        <div style="flex:1;text-align:center;">
+            <div style="font-size:26px;font-weight:800;">{total}</div>
+            <div style="font-size:11px;opacity:0.7;margin-top:2px;">Sesiones totales</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
+        <div style="flex:1;text-align:center;">
+            <div style="font-size:26px;font-weight:800;">{activas}</div>
+            <div style="font-size:11px;opacity:0.7;margin-top:2px;">Prácticas activas</div>
+        </div>
+        <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
+        <div style="flex:1;text-align:center;">
+            <div style="font-size:26px;font-weight:800;">{racha}</div>
+            <div style="font-size:11px;opacity:0.7;margin-top:2px;">Días de racha</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+    # Botón "Ver mi avance" pegado al hero
+    st.markdown("""
+<style>
+div[data-testid="stButton"]:has(button[kind="primary"]#btn_hero_avance) button {
+    background: white !important;
+    color: #3C3489 !important;
+    border: none !important;
+    border-radius: 0 0 12px 12px !important;
+    margin-top: 0 !important;
+    font-weight: 700 !important;
+}
+</style>""", unsafe_allow_html=True)
+
+    col_btn, _ = st.columns([1, 2])
+    with col_btn:
+        if st.button("Ver mi avance →", key="btn_hero_avance", type="primary", use_container_width=True):
+            st.session_state.practica_sel = "panel_avance"
+            st.rerun()
+
+
+# ── Bloque 2: Ecosistema dual ─────────────────────────────────────────────────
+
+def _bloque_ecosistema():
+    st.markdown("""
+<div style="background:white;border:1px solid #E8E6F0;border-radius:14px;
+            padding:24px 28px;margin-top:16px;">
+    <div style="font-size:18px;font-weight:700;color:#3C3489;margin-bottom:10px;">
+        Un ecosistema dual
+    </div>
+    <div style="font-size:14px;color:#888780;line-height:1.7;margin-bottom:20px;">
+        La Suite YoCreo es a la vez un set práctico de herramientas y un camino de evolución
+        personal. Un viaje que va desde el dominio interior, pasa por la excelencia con otros
+        y llega a la maestría estratégica.
+    </div>
+    <div style="display:flex;gap:12px;">
+        <div style="flex:1;background:#F5F4FA;border-radius:10px;padding:14px 16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <div style="width:10px;height:10px;border-radius:50%;background:#534AB7;flex-shrink:0;"></div>
+                <div style="font-size:13px;font-weight:700;color:#26215C;">Dominio interior</div>
+            </div>
+            <div style="font-size:11px;color:#888780;padding-left:18px;">Autogestión y foco</div>
+        </div>
+        <div style="flex:1;background:#F5F4FA;border-radius:10px;padding:14px 16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <div style="width:10px;height:10px;border-radius:50%;background:#27AE60;flex-shrink:0;"></div>
+                <div style="font-size:13px;font-weight:700;color:#26215C;">Excelencia con otros</div>
+            </div>
+            <div style="font-size:11px;color:#888780;padding-left:18px;">Coordinación y desarrollo</div>
+        </div>
+        <div style="flex:1;background:#F5F4FA;border-radius:10px;padding:14px 16px;">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;">
+                <div style="width:10px;height:10px;border-radius:50%;background:#FF6B4E;flex-shrink:0;"></div>
+                <div style="font-size:13px;font-weight:700;color:#26215C;">Maestría estratégica</div>
+            </div>
+            <div style="font-size:11px;color:#888780;padding-left:18px;">Visión y relaciones</div>
+        </div>
+    </div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ── Bloque 3: El camino del líder consciente ──────────────────────────────────
+
+def _badge_dimension(pct: float) -> str:
+    if pct >= 90:
+        return '<span style="background:#E8F8F0;color:#1E8449;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;">Zona de confort</span>'
+    elif pct >= 40:
+        return '<span style="background:#EBF5FB;color:#1A5276;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;">En crecimiento</span>'
+    else:
+        return '<span style="background:#FEF9E7;color:#B7770D;font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;">Zona ciega</span>'
+
+
+def _bloque_camino(conteo: Counter):
+    st.markdown("""
+<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
+            color:#888780;font-weight:600;margin:24px 0 12px 0;">
+    El camino del líder consciente
+</div>
+""", unsafe_allow_html=True)
+
+    dims = list(DIMENSIONES_INTRO.items())
+    col1, col2 = st.columns(2)
+
+    for i, (nombre, datos) in enumerate(dims):
+        col = col1 if i % 2 == 0 else col2
+
+        practicas     = datos["practicas"]
+        usadas        = sum(1 for p in practicas if conteo[p] > 0)
+        pct           = round(usadas / len(practicas) * 100) if practicas else 0
+        badge         = _badge_dimension(pct)
+
+        pills_html = "".join([
+            f'<span style="background:rgba(0,0,0,0.06);color:#26215C;font-size:10px;'
+            f'padding:2px 8px;border-radius:8px;margin:2px 2px 2px 0;display:inline-block;">'
+            f'{PRACTICAS_CORTOS[p]}</span>'
+            for p in practicas
+        ])
+
+        bar_fill = f'width:{pct}%;background:#534AB7;height:4px;border-radius:2px;'
+
+        with col:
+            st.markdown(f"""
+<div style="background:{datos['bg']};border-radius:14px;padding:18px 20px;margin-bottom:12px;
+            border:1px solid #E8E6F0;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;">
+        <div>
+            <div style="font-size:11px;color:#888780;font-weight:600;">{datos['num']}</div>
+            <div style="font-size:15px;font-weight:700;color:#26215C;margin-top:2px;">
+                {datos['icon']} {nombre}
+            </div>
+        </div>
+        {badge}
+    </div>
+    <div style="margin-bottom:10px;">{pills_html}</div>
+    <div style="background:rgba(0,0,0,0.08);border-radius:2px;height:4px;">
+        <div style="{bar_fill}"></div>
+    </div>
+    <div style="font-size:10px;color:#888780;margin-top:4px;">{usadas}/{len(practicas)} prácticas exploradas</div>
+</div>
+""", unsafe_allow_html=True)
+
+
+# ── Bloque 4: Accesos rápidos ─────────────────────────────────────────────────
+
+def _bloque_accesos(conteo: Counter, eventos_desc: list):
+    st.markdown("""
+<div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
+            color:#888780;font-weight:600;margin:24px 0 12px 0;">
+    Accesos rápidos
+</div>
+""", unsafe_allow_html=True)
+
+    cards = []
+
+    # Última práctica usada
+    if eventos_desc:
+        key1  = eventos_desc[0]["practice_key"]
+        fecha = _hace_n_dias(eventos_desc[0]["created_at"])
+        usos1 = conteo[key1]
+        cards.append({
+            "key":   key1,
+            "label": PRACTICAS_CORTOS.get(key1, key1),
+            "meta":  f"{usos1} uso{'s' if usos1 != 1 else ''} · {fecha}",
+            "tag":   "Reciente",
+            "tag_color": "#EBF5FB",
+            "tag_text":  "#1A5276",
+        })
+
+    # Segunda más usada (diferente a la primera)
+    top2 = [k for k, _ in conteo.most_common() if k != (cards[0]["key"] if cards else None)]
+    if top2:
+        key2  = top2[0]
+        usos2 = conteo[key2]
+        # fecha del último uso de esta práctica
+        ev2   = next((e for e in eventos_desc if e["practice_key"] == key2), None)
+        fecha2 = _hace_n_dias(ev2["created_at"]) if ev2 else ""
+        cards.append({
+            "key":   key2,
+            "label": PRACTICAS_CORTOS.get(key2, key2),
+            "meta":  f"{usos2} uso{'s' if usos2 != 1 else ''} · {fecha2}",
+            "tag":   "Más usada",
+            "tag_color": "#F5F4FA",
+            "tag_text":  "#534AB7",
+        })
+
+    # Práctica no explorada (recomendada)
+    sin_explorar = [k for k in TODAS_LAS_PRACTICAS if conteo[k] == 0]
+    if sin_explorar:
+        key3 = sin_explorar[0]
+        cards.append({
+            "key":   key3,
+            "label": PRACTICAS_CORTOS.get(key3, key3),
+            "meta":  "Sin explorar · recomendada",
+            "tag":   "Recomendada",
+            "tag_color": "#FEF9E7",
+            "tag_text":  "#B7770D",
+        })
+
+    if not cards:
+        st.info("Completa tu primera práctica para ver accesos rápidos aquí.")
+        return
+
+    cols = st.columns(len(cards))
+    for i, (card, col) in enumerate(zip(cards, cols)):
+        titulo_completo = PRACTICAS.get(card["key"], {}).get("titulo", card["label"])
+        with col:
+            clicked = st.button(
+                f"**{card['label']}**\n\n_{card['meta']}_",
+                key=f"quick_{card['key']}",
+                use_container_width=True,
+            )
+            st.markdown(
+                f'<span style="background:{card["tag_color"]};color:{card["tag_text"]};'
+                f'font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;">'
+                f'{card["tag"]}</span>',
+                unsafe_allow_html=True
+            )
+            if clicked and card["key"] in PRACTICAS:
+                st.session_state.practica_sel = card["key"]
+                st.rerun()
+
+
+# ── Render principal ──────────────────────────────────────────────────────────
+
+def render():
+    """Renderiza la página de inicio personalizada."""
+
     _mostrar_onboarding_tour()
 
-    with st.container(border=True):
-        st.markdown(f"### {info['titulo']}")
+    user   = st.session_state.get("user", {})
+    email  = user.get("email", "")
+    nombre = user.get("nombre", "") or email.split("@")[0]
 
-        st.markdown("""
-        <div style="font-size: 16px; line-height: 1.8; color: #333; text-align: justify; padding: 10px 0;">
-            Puedes concebir la <strong style="color: #4E32AD;">'Suite Liderazgo Consciente'</strong> como un ecosistema dual:
-            por un lado, un set práctico de herramientas; por el otro, un camino de evolución personal.
-        </div>
+    datos = _cargar_datos(email)
 
-        <div style="font-size: 16px; line-height: 1.8; color: #333; text-align: justify; padding: 10px 0;">
-            Un viaje que va desde el <strong style="color: #FF6B4E;">dominio interior</strong> (autogestión),
-            pasando por la <strong style="color: #FF6B4E;">excelencia con otros</strong> (coordinación),
-            hasta alcanzar la <strong style="color: #FF6B4E;">maestría en la visión estratégica</strong>.
-        </div>
-        """, unsafe_allow_html=True)
-
-    with st.container(border=True):
-        st.markdown("#### El Camino del Lider Consciente")
-
-        col1, col2 = st.columns(2)
-
-        with col1:
-            st.markdown("""
-            **1. Autogestión y Foco**
-            - Priorizar con claridad
-            - Presentar con impacto
-
-            **2. Coordinación Impecable**
-            - Pedir con precisión
-            - Delegar con inteligencia
-            - Comunicar con diplomacia
-            - Cumplir compromisos
-            """)
-
-        with col2:
-            st.markdown("""
-            **3. Desarrollo de Otros**
-            - Escuchar activamente
-            - Preguntar con profundidad
-            - Dar feedback constructivo
-            - Evaluar con justicia
-
-            **4. Estrategia y Relaciones**
-            - Definir objetivos claros
-            - Planificar reuniones efectivas
-            - Negociar con maestría
-            - Reparar vínculos
-            """)
+    _bloque_hero(nombre, datos)
+    _bloque_ecosistema()
+    _bloque_camino(datos["conteo"])
+    _bloque_accesos(datos["conteo"], datos["eventos_desc"])
