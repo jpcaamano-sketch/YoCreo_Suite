@@ -231,65 +231,71 @@ def _bloque_hero(nombre: str, datos: dict):
     racha   = datos["racha"]
     zona_ciega = datos.get("zona_ciega")
 
-    nombre_display = nombre.split()[0].capitalize() if nombre else "Líder"
+    # Nombre: hasta 2 palabras
+    partes = nombre.strip().split() if nombre else ["Líder"]
+    nombre_display = " ".join(partes[:2]).title()
 
     if total == 0:
         subtitulo = "Comienza hoy tu camino de liderazgo consciente. Todas las prácticas te esperan."
     elif racha >= 2:
-        sufijo = f"Tu zona ciega: <strong>{zona_ciega}</strong>." if zona_ciega else ""
+        sufijo = f"Tu zona ciega está en <strong>{zona_ciega}</strong> — es donde más puedes crecer hoy." if zona_ciega else ""
         subtitulo = f"Llevas <strong>{racha} días</strong> consecutivos practicando. {sufijo}"
     elif racha == 1:
-        sufijo = f"Tu zona ciega: <strong>{zona_ciega}</strong>." if zona_ciega else ""
+        sufijo = f"Tu zona ciega está en <strong>{zona_ciega}</strong> — es donde más puedes crecer hoy." if zona_ciega else ""
         subtitulo = f"Hoy volviste a practicar. {sufijo}"
     else:
-        sufijo = f"Tu zona ciega: <strong>{zona_ciega}</strong>." if zona_ciega else ""
+        sufijo = f"Tu zona ciega está en <strong>{zona_ciega}</strong> — es donde más puedes crecer hoy." if zona_ciega else ""
         subtitulo = f"Es un buen momento para retomar el ritmo. {sufijo}"
 
+    # Hero completo como HTML — botón dentro del card dispara el botón oculto Streamlit
     st.markdown(f"""
 <div style="background:linear-gradient(135deg,#3C3489 0%,#534AB7 100%);
-            border-radius:16px;padding:32px 28px 28px 28px;color:white;margin-bottom:4px;">
+            border-radius:16px;padding:36px 32px 28px 32px;color:white;
+            position:relative;overflow:hidden;">
+    <div style="position:absolute;width:220px;height:220px;border-radius:50%;
+                background:rgba(255,255,255,0.05);top:-60px;right:-60px;pointer-events:none;"></div>
+    <div style="position:absolute;width:140px;height:140px;border-radius:50%;
+                background:rgba(255,255,255,0.05);bottom:-40px;right:80px;pointer-events:none;"></div>
     <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
-                opacity:0.7;margin-bottom:8px;">Bienvenido de vuelta</div>
-    <div style="font-size:28px;font-weight:800;margin-bottom:10px;">Hola, {nombre_display} 👋</div>
-    <div style="font-size:14px;opacity:0.85;line-height:1.6;margin-bottom:24px;">{subtitulo}</div>
-    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.2);margin:0 0 20px 0;">
-    <div style="display:flex;gap:0;">
-        <div style="flex:1;text-align:center;">
-            <div style="font-size:26px;font-weight:800;">{total}</div>
-            <div style="font-size:11px;opacity:0.7;margin-top:2px;">Sesiones totales</div>
+                opacity:0.65;margin-bottom:10px;">Bienvenido de vuelta</div>
+    <div style="font-size:30px;font-weight:800;margin-bottom:12px;line-height:1.2;">Hola, {nombre_display}</div>
+    <div style="font-size:14px;opacity:0.85;line-height:1.65;margin-bottom:24px;">{subtitulo}</div>
+    <button onclick="(function(){{
+        var btns=window.parent.document.querySelectorAll('button');
+        for(var i=0;i<btns.length;i++){{if(btns[i].innerText.trim()==='__nav_avance__'){{btns[i].click();return;}}}}
+    }})()"
+        style="background:rgba(255,255,255,0.18);color:white;
+               border:1.5px solid rgba(255,255,255,0.45);border-radius:10px;
+               padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer;
+               margin-bottom:28px;font-family:inherit;">
+        Ver mi avance →
+    </button>
+    <hr style="border:none;border-top:1px solid rgba(255,255,255,0.18);margin:0 0 20px 0;">
+    <div style="display:flex;">
+        <div style="flex:1;">
+            <div style="font-size:28px;font-weight:800;">{total}</div>
+            <div style="font-size:11px;opacity:0.65;margin-top:3px;">Sesiones</div>
         </div>
-        <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
-        <div style="flex:1;text-align:center;">
-            <div style="font-size:26px;font-weight:800;">{activas}</div>
-            <div style="font-size:11px;opacity:0.7;margin-top:2px;">Prácticas activas</div>
+        <div style="width:1px;background:rgba(255,255,255,0.18);margin:0 24px;"></div>
+        <div style="flex:1;">
+            <div style="font-size:28px;font-weight:800;">{activas}</div>
+            <div style="font-size:11px;opacity:0.65;margin-top:3px;">Prácticas activas</div>
         </div>
-        <div style="width:1px;background:rgba(255,255,255,0.2);"></div>
-        <div style="flex:1;text-align:center;">
-            <div style="font-size:26px;font-weight:800;">{racha}</div>
-            <div style="font-size:11px;opacity:0.7;margin-top:2px;">Días de racha</div>
+        <div style="width:1px;background:rgba(255,255,255,0.18);margin:0 24px;"></div>
+        <div style="flex:1;">
+            <div style="font-size:28px;font-weight:800;">{racha}</div>
+            <div style="font-size:11px;opacity:0.65;margin-top:3px;">Días de racha</div>
         </div>
     </div>
 </div>
 """, unsafe_allow_html=True)
 
-    # Botón "Ver mi avance" pegado al hero
-    st.markdown("""
-<style>
-div[data-testid="stButton"]:has(button[kind="primary"]#btn_hero_avance) button {
-    background: white !important;
-    color: #3C3489 !important;
-    border: none !important;
-    border-radius: 0 0 12px 12px !important;
-    margin-top: 0 !important;
-    font-weight: 700 !important;
-}
-</style>""", unsafe_allow_html=True)
-
-    col_btn, _ = st.columns([1, 2])
-    with col_btn:
-        if st.button("Ver mi avance →", key="btn_hero_avance", type="primary", use_container_width=True):
-            st.session_state.practica_sel = "panel_avance"
-            st.rerun()
+    # Botón Streamlit oculto — disparado por el botón HTML del hero
+    st.markdown('<div style="visibility:hidden;height:0;overflow:hidden;">', unsafe_allow_html=True)
+    if st.button("__nav_avance__", key="btn_hero_avance"):
+        st.session_state.practica_sel = "panel_avance"
+        st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
 
 
 # ── Bloque 2: Ecosistema dual ─────────────────────────────────────────────────
