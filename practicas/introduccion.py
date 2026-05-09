@@ -291,11 +291,24 @@ def _bloque_hero(nombre: str, datos: dict):
 """, unsafe_allow_html=True)
 
     # Botón Streamlit oculto — disparado por el botón HTML del hero
-    st.markdown('<div style="visibility:hidden;height:0;overflow:hidden;">', unsafe_allow_html=True)
     if st.button("__nav_avance__", key="btn_hero_avance"):
         st.session_state.practica_sel = "panel_avance"
         st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    # JS que oculta el botón y lo mantiene oculto tras cada rerender
+    components.html("""<script>
+(function(){
+  function hide(){
+    window.parent.document.querySelectorAll('button').forEach(function(b){
+      if(b.innerText.trim()==='__nav_avance__'){
+        var wrap=b.closest('[data-testid="stButton"]')||b.parentElement;
+        if(wrap) wrap.style.cssText='display:none!important;height:0;overflow:hidden;';
+      }
+    });
+  }
+  hide(); setTimeout(hide,200); setTimeout(hide,600);
+  new MutationObserver(hide).observe(window.parent.document.body,{childList:true,subtree:true});
+})();
+</script>""", height=0)
 
 
 # ── Bloque 2: Ecosistema dual ─────────────────────────────────────────────────
@@ -460,24 +473,55 @@ def _bloque_accesos(conteo: Counter, eventos_desc: list):
         st.info("Completa tu primera práctica para ver accesos rápidos aquí.")
         return
 
-    cols = st.columns(len(cards))
-    for i, (card, col) in enumerate(zip(cards, cols)):
-        titulo_completo = PRACTICAS.get(card["key"], {}).get("titulo", card["label"])
-        with col:
-            clicked = st.button(
-                f"**{card['label']}**\n\n_{card['meta']}_",
-                key=f"quick_{card['key']}",
-                use_container_width=True,
-            )
-            st.markdown(
-                f'<span style="background:{card["tag_color"]};color:{card["tag_text"]};'
-                f'font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;">'
-                f'{card["tag"]}</span>',
-                unsafe_allow_html=True
-            )
-            if clicked and card["key"] in PRACTICAS:
-                st.session_state.practica_sel = card["key"]
-                st.rerun()
+    # Cards HTML con igual altura — botones Streamlit ocultos para la navegación
+    cards_html = '<div style="display:flex;gap:12px;">'
+    for card in cards:
+        cards_html += f"""
+<div onclick="(function(){{
+    var btns=window.parent.document.querySelectorAll('button');
+    for(var i=0;i<btns.length;i++){{
+        if(btns[i].innerText.trim()==='__quick_{card['key']}__'){{btns[i].click();return;}}
+    }}}})()"
+     style="flex:1;background:white;border:1px solid #E8E6F0;border-radius:12px;
+            padding:16px;cursor:pointer;min-height:90px;display:flex;flex-direction:column;
+            justify-content:space-between;transition:box-shadow 0.2s;"
+     onmouseover="this.style.boxShadow='0 4px 12px rgba(60,52,137,0.12)'"
+     onmouseout="this.style.boxShadow='none'">
+    <div>
+        <div style="font-size:14px;font-weight:700;color:#26215C;margin-bottom:4px;">{card['label']}</div>
+        <div style="font-size:12px;color:#888780;">{card['meta']}</div>
+    </div>
+    <div style="margin-top:10px;">
+        <span style="background:{card['tag_color']};color:{card['tag_text']};
+                     font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;">
+            {card['tag']}
+        </span>
+    </div>
+</div>"""
+    cards_html += '</div>'
+    st.markdown(cards_html, unsafe_allow_html=True)
+
+    # Botones Streamlit ocultos para navegación
+    for card in cards:
+        if st.button(f"__quick_{card['key']}__", key=f"quick_{card['key']}"):
+            st.session_state.practica_sel = card["key"]
+            st.rerun()
+
+    # Ocultar todos los botones __quick_*__
+    components.html("""<script>
+(function(){
+  function hide(){
+    window.parent.document.querySelectorAll('button').forEach(function(b){
+      if(b.innerText.trim().startsWith('__quick_')){
+        var wrap=b.closest('[data-testid="stButton"]')||b.parentElement;
+        if(wrap) wrap.style.cssText='display:none!important;height:0;overflow:hidden;';
+      }
+    });
+  }
+  hide(); setTimeout(hide,200); setTimeout(hide,600);
+  new MutationObserver(hide).observe(window.parent.document.body,{childList:true,subtree:true});
+})();
+</script>""", height=0)
 
 
 # ── Render principal ──────────────────────────────────────────────────────────
