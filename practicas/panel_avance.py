@@ -231,7 +231,7 @@ def _capa_estilo(conteo: Counter, total_sesiones: int):
             st.session_state[cache_key] = perfil
             _mostrar_perfil(perfil)
         else:
-            st.error("No se pudo generar el perfil. Intenta de nuevo.")
+            st.error("No se pudo generar el perfil. Revisa los logs de la app para ver el error exacto.")
 
 
 def _generar_perfil_ia(conteo: Counter, total_sesiones: int) -> dict | None:
@@ -251,43 +251,76 @@ def _generar_perfil_ia(conteo: Counter, total_sesiones: int) -> dict | None:
         dims_uso = {}
         for nombre_dim, datos in DIMENSIONES.items():
             dims_uso[nombre_dim] = sum(conteo[p] for p in datos["practicas"])
-        dim_top = max(dims_uso, key=dims_uso.get)
+        dim_top  = max(dims_uso, key=dims_uso.get)
         dim_baja = min(dims_uso, key=dims_uso.get)
 
-        prompt = f"""Eres un coach de liderazgo experto. Analiza los patrones de uso de un líder
-en una suite de prácticas de liderazgo y genera un perfil breve y motivador.
+        prompt = f"""Eres un coach de liderazgo experto. Analiza estos patrones de uso y genera un perfil.
 
-DATOS DEL LÍDER:
-- Total de sesiones: {total_sesiones}
-- Dimensión más desarrollada: {dim_top}
+DATOS:
+- Sesiones totales: {total_sesiones}
+- Dimensión más usada: {dim_top}
 - Dimensión menos explorada: {dim_baja}
-- Prácticas utilizadas (de más a menos):
+- Prácticas usadas:
 {resumen_uso}
 
-Genera exactamente este formato separado por |||:
+Responde en este formato EXACTO (usa el separador ### entre secciones):
 
-[Un párrafo de 3-4 oraciones describiendo el estilo de liderazgo emergente del usuario,
-en segunda persona (tú), basado en sus patrones de uso. Sé específico, inspirador y honesto.]
-|||
-[3 fortalezas en formato: Etiqueta corta (3-4 palabras)]
-|||
-[2 áreas de desarrollo en formato: Etiqueta corta (3-4 palabras)]
+PERFIL
+[3-4 oraciones en segunda persona describiendo el estilo de liderazgo emergente]
+###
+FORTALEZAS
+[fortaleza 1]
+[fortaleza 2]
+[fortaleza 3]
+###
+DESARROLLO
+[área 1]
+[área 2]
 
-No uses asteriscos ni markdown. Solo texto plano."""
+Sin asteriscos ni markdown."""
 
-        model = genai.GenerativeModel(AI_CONFIG["model"])
-        resp  = model.generate_content(prompt)
-        partes = resp.text.split("|||")
-        if len(partes) < 3:
-            return None
+        model  = genai.GenerativeModel(AI_CONFIG["model"])
+        resp   = model.generate_content(
+            prompt,
+            generation_config=genai.types.GenerationConfig(max_output_tokens=800)
+        )
+        texto_raw = resp.text
+        logger.info("Respuesta Gemini perfil: %s", texto_raw[:200])
 
-        fortalezas = [t.strip().lstrip("-•").strip() for t in partes[1].strip().split("\n") if t.strip()]
-        areas      = [t.strip().lstrip("-•").strip() for t in partes[2].strip().split("\n") if t.strip()]
+        partes = texto_raw.split("###")
+
+        # Extraer perfil
+        perfil_txt = ""
+        fortalezas = []
+        areas      = []
+
+        for parte in partes:
+            p = parte.strip()
+            if p.upper().startswith("PERFIL"):
+                perfil_txt = p[6:].strip()
+            elif p.upper().startswith("FORTALEZAS"):
+                lines = [l.strip().lstrip("-•123456789.").strip() for l in p[10:].strip().split("\n") if l.strip()]
+                fortalezas = [l for l in lines if l][:3]
+            elif p.upper().startswith("DESARROLLO"):
+                lines = [l.strip().lstrip("-•123456789.").strip() for l in p[10:].strip().split("\n") if l.strip()]
+                areas = [l for l in lines if l][:2]
+
+        if not perfil_txt:
+            # Fallback: tomar la primera parte como perfil
+            perfil_txt = partes[0].strip()
+
+        if not fortalezas and len(partes) > 1:
+            lines = [l.strip().lstrip("-•123456789.").strip() for l in partes[1].strip().split("\n") if l.strip()]
+            fortalezas = [l for l in lines if l and len(l) > 3][:3]
+
+        if not areas and len(partes) > 2:
+            lines = [l.strip().lstrip("-•123456789.").strip() for l in partes[2].strip().split("\n") if l.strip()]
+            areas = [l for l in lines if l and len(l) > 3][:2]
 
         return {
-            "texto":      partes[0].strip(),
-            "fortalezas": fortalezas[:3],
-            "areas":      areas[:2],
+            "texto":      perfil_txt,
+            "fortalezas": fortalezas,
+            "areas":      areas,
         }
     except Exception as e:
         logger.error("Error generando perfil IA: %s", e)
