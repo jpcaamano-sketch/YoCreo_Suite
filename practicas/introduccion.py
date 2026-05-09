@@ -247,10 +247,10 @@ def _bloque_hero(nombre: str, datos: dict):
         sufijo = f"Tu zona ciega está en <strong>{zona_ciega}</strong> — es donde más puedes crecer hoy." if zona_ciega else ""
         subtitulo = f"Es un buen momento para retomar el ritmo. {sufijo}"
 
-    # Hero completo como HTML — botón dentro del card dispara el botón oculto Streamlit
+    # Hero — solo HTML visual, sin botones ocultos
     st.markdown(f"""
 <div style="background:linear-gradient(135deg,#3C3489 0%,#534AB7 100%);
-            border-radius:16px;padding:36px 32px 28px 32px;color:white;
+            border-radius:16px 16px 0 0;padding:36px 32px 28px 32px;color:white;
             position:relative;overflow:hidden;">
     <div style="position:absolute;width:220px;height:220px;border-radius:50%;
                 background:rgba(255,255,255,0.05);top:-60px;right:-60px;pointer-events:none;"></div>
@@ -259,17 +259,7 @@ def _bloque_hero(nombre: str, datos: dict):
     <div style="font-size:11px;letter-spacing:2px;text-transform:uppercase;
                 opacity:0.65;margin-bottom:10px;">Bienvenido de vuelta</div>
     <div style="font-size:30px;font-weight:800;margin-bottom:12px;line-height:1.2;">Hola, {nombre_display}</div>
-    <div style="font-size:14px;opacity:0.85;line-height:1.65;margin-bottom:24px;">{subtitulo}</div>
-    <button onclick="(function(){{
-        var btns=window.parent.document.querySelectorAll('button');
-        for(var i=0;i<btns.length;i++){{if(btns[i].innerText.trim()==='__nav_avance__'){{btns[i].click();return;}}}}
-    }})()"
-        style="background:rgba(255,255,255,0.18);color:white;
-               border:1.5px solid rgba(255,255,255,0.45);border-radius:10px;
-               padding:11px 24px;font-size:14px;font-weight:600;cursor:pointer;
-               margin-bottom:28px;font-family:inherit;">
-        Ver mi avance →
-    </button>
+    <div style="font-size:14px;opacity:0.85;line-height:1.65;margin-bottom:28px;">{subtitulo}</div>
     <hr style="border:none;border-top:1px solid rgba(255,255,255,0.18);margin:0 0 20px 0;">
     <div style="display:flex;">
         <div style="flex:1;">
@@ -290,25 +280,30 @@ def _bloque_hero(nombre: str, datos: dict):
 </div>
 """, unsafe_allow_html=True)
 
-    # Botón Streamlit oculto — disparado por el botón HTML del hero
-    if st.button("__nav_avance__", key="btn_hero_avance"):
+    # Botón pegado visualmente al hero (borde superior recto, misma paleta)
+    st.markdown("""
+<style>
+div[data-testid="stButton"]:has(button[data-testid="baseButton-primary"]) {
+    margin-top: 0 !important;
+}
+div[data-testid="stButton"]:has(button[data-testid="baseButton-primary"]) button {
+    border-radius: 0 0 16px 16px !important;
+    background: #534AB7 !important;
+    border-color: #534AB7 !important;
+    color: white !important;
+    font-weight: 600 !important;
+    padding: 14px !important;
+}
+div[data-testid="stButton"]:has(button[data-testid="baseButton-primary"]) button:hover {
+    background: #4A3DA8 !important;
+    border-color: #4A3DA8 !important;
+}
+</style>
+""", unsafe_allow_html=True)
+
+    if st.button("Ver mi avance →", key="btn_hero_avance", type="primary", use_container_width=True):
         st.session_state.practica_sel = "panel_avance"
         st.rerun()
-    # JS que oculta el botón y lo mantiene oculto tras cada rerender
-    components.html("""<script>
-(function(){
-  function hide(){
-    window.parent.document.querySelectorAll('button').forEach(function(b){
-      if(b.innerText.trim()==='__nav_avance__'){
-        var wrap=b.closest('[data-testid="stButton"]')||b.parentElement;
-        if(wrap) wrap.style.cssText='display:none!important;height:0;overflow:hidden;';
-      }
-    });
-  }
-  hide(); setTimeout(hide,200); setTimeout(hide,600);
-  new MutationObserver(hide).observe(window.parent.document.body,{childList:true,subtree:true});
-})();
-</script>""", height=0)
 
 
 # ── Bloque 2: Ecosistema dual ─────────────────────────────────────────────────
@@ -473,55 +468,47 @@ def _bloque_accesos(conteo: Counter, eventos_desc: list):
         st.info("Completa tu primera práctica para ver accesos rápidos aquí.")
         return
 
-    # Cards HTML con igual altura — botones Streamlit ocultos para la navegación
-    cards_html = '<div style="display:flex;gap:12px;">'
-    for card in cards:
-        cards_html += f"""
-<div onclick="(function(){{
-    var btns=window.parent.document.querySelectorAll('button');
-    for(var i=0;i<btns.length;i++){{
-        if(btns[i].innerText.trim()==='__quick_{card['key']}__'){{btns[i].click();return;}}
-    }}}})()"
-     style="flex:1;background:white;border:1px solid #E8E6F0;border-radius:12px;
-            padding:16px;cursor:pointer;min-height:90px;display:flex;flex-direction:column;
-            justify-content:space-between;transition:box-shadow 0.2s;"
-     onmouseover="this.style.boxShadow='0 4px 12px rgba(60,52,137,0.12)'"
-     onmouseout="this.style.boxShadow='none'">
-    <div>
-        <div style="font-size:14px;font-weight:700;color:#26215C;margin-bottom:4px;">{card['label']}</div>
-        <div style="font-size:12px;color:#888780;">{card['meta']}</div>
-    </div>
-    <div style="margin-top:10px;">
-        <span style="background:{card['tag_color']};color:{card['tag_text']};
-                     font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;">
-            {card['tag']}
-        </span>
-    </div>
-</div>"""
-    cards_html += '</div>'
-    st.markdown(cards_html, unsafe_allow_html=True)
+    # CSS para igualar la altura de los botones en columnas
+    st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button {
+    min-height: 80px !important;
+    height: 80px !important;
+    white-space: normal !important;
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    justify-content: center !important;
+    padding: 12px 16px !important;
+    border: 1px solid #E8E6F0 !important;
+    background: white !important;
+    color: #26215C !important;
+    font-weight: 400 !important;
+    border-radius: 12px !important;
+    text-align: left !important;
+}
+div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button:hover {
+    border-color: #534AB7 !important;
+    box-shadow: 0 4px 12px rgba(60,52,137,0.12) !important;
+}
+div[data-testid="stHorizontalBlock"] div[data-testid="stButton"] button p {
+    margin: 0 !important;
+}
+</style>
+""", unsafe_allow_html=True)
 
-    # Botones Streamlit ocultos para navegación
-    for card in cards:
-        if st.button(f"__quick_{card['key']}__", key=f"quick_{card['key']}"):
-            st.session_state.practica_sel = card["key"]
-            st.rerun()
-
-    # Ocultar todos los botones __quick_*__
-    components.html("""<script>
-(function(){
-  function hide(){
-    window.parent.document.querySelectorAll('button').forEach(function(b){
-      if(b.innerText.trim().startsWith('__quick_')){
-        var wrap=b.closest('[data-testid="stButton"]')||b.parentElement;
-        if(wrap) wrap.style.cssText='display:none!important;height:0;overflow:hidden;';
-      }
-    });
-  }
-  hide(); setTimeout(hide,200); setTimeout(hide,600);
-  new MutationObserver(hide).observe(window.parent.document.body,{childList:true,subtree:true});
-})();
-</script>""", height=0)
+    cols = st.columns(len(cards))
+    for card, col in zip(cards, cols):
+        tag_html = f'<span style="background:{card["tag_color"]};color:{card["tag_text"]};font-size:10px;font-weight:700;padding:2px 8px;border-radius:8px;">{card["tag"]}</span>'
+        with col:
+            if st.button(
+                f"**{card['label']}**  \n{card['meta']}",
+                key=f"quick_{card['key']}",
+                use_container_width=True,
+            ):
+                st.session_state.practica_sel = card["key"]
+                st.rerun()
+            st.markdown(tag_html, unsafe_allow_html=True)
 
 
 # ── Render principal ──────────────────────────────────────────────────────────
