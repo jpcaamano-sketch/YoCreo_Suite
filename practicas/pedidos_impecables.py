@@ -8,19 +8,12 @@ import json
 from datetime import date
 
 from core.config import PRACTICAS
-from core.ai_client import generate_response
+from core.ai_client import generate_response, limpiar_json
 from core.export import copy_button_component, create_pdf_reportlab, render_encabezado
 from core.analytics import registrar_uso
 from core.historial import guardar_generacion
 
 
-def limpiar_json(texto):
-    """Limpia la respuesta de la IA para obtener JSON valido."""
-    try:
-        texto_limpio = texto.replace("```json", "").replace("```", "").strip()
-        return json.loads(texto_limpio)
-    except:
-        return None
 
 
 def generar_pedido_ai(oyente, accion, condiciones, tiempo, trasfondo):

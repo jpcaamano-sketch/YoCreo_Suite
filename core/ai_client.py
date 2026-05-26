@@ -3,22 +3,26 @@ Cliente de IA para YoCreo Suite
 Protocolo: gemini-2.5-flash
 """
 
+import json
 import time
 import logging
 import streamlit as st
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 from .config import AI_CONFIG
 
 logger = logging.getLogger(__name__)
 
 _COOLDOWN_SECS = 15  # segundos entre llamadas por usuario
+_client: genai.Client | None = None
 
 
 def init_ai():
     """Inicializa el cliente de IA con la API key de secrets"""
+    global _client
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
-        genai.configure(api_key=api_key)
+        _client = genai.Client(api_key=api_key)
         return True
     except Exception as e:
         logger.error("Error al configurar IA: %s", e)
@@ -59,17 +63,54 @@ def generate_response(prompt, max_tokens=None):
     """
     if not _check_rate_limit():
         return None
+    if _client is None:
+        st.error("Servicio de IA no inicializado. Recarga la página.")
+        return None
     try:
         tokens = max_tokens or AI_CONFIG.get("max_tokens", 8192)
-        generation_config = genai.types.GenerationConfig(
-            max_output_tokens=tokens
+        response = _client.models.generate_content(
+            model=AI_CONFIG["model"],
+            contents=prompt,
+            config=types.GenerateContentConfig(max_output_tokens=tokens)
         )
-        model = genai.GenerativeModel(AI_CONFIG["model"])
-        response = model.generate_content(prompt, generation_config=generation_config)
         return response.text
     except Exception as e:
         logger.error("Error al generar respuesta: %s", e)
         st.error("No se pudo generar la respuesta. Intenta de nuevo en unos segundos.")
+        return None
+
+
+def _escape_newlines_in_strings(text):
+    """Escapa newlines literales dentro de valores string JSON."""
+    result = []
+    in_string = False
+    i = 0
+    while i < len(text):
+        c = text[i]
+        if c == '"' and (i == 0 or text[i - 1] != '\\'):
+            in_string = not in_string
+            result.append(c)
+        elif c == '\n' and in_string:
+            result.append('\\n')
+        elif c == '\r' and in_string:
+            result.append('\\r')
+        elif c == '\t' and in_string:
+            result.append('\\t')
+        else:
+            result.append(c)
+        i += 1
+    return ''.join(result)
+
+
+def limpiar_json(texto):
+    """Parsea JSON de respuesta IA, manejando newlines literales dentro de strings."""
+    try:
+        texto_limpio = texto.replace("```json", "").replace("```", "").strip()
+        try:
+            return json.loads(texto_limpio)
+        except json.JSONDecodeError:
+            return json.loads(_escape_newlines_in_strings(texto_limpio))
+    except Exception:
         return None
 
 
