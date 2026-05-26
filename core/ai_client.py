@@ -7,22 +7,19 @@ import json
 import time
 import logging
 import streamlit as st
-from google import genai
-from google.genai import types
+import google.generativeai as genai
 from .config import AI_CONFIG
 
 logger = logging.getLogger(__name__)
 
 _COOLDOWN_SECS = 15  # segundos entre llamadas por usuario
-_client: genai.Client | None = None
 
 
 def init_ai():
     """Inicializa el cliente de IA con la API key de secrets"""
-    global _client
     try:
         api_key = st.secrets["GOOGLE_API_KEY"]
-        _client = genai.Client(api_key=api_key)
+        genai.configure(api_key=api_key)
         return True
     except Exception as e:
         logger.error("Error al configurar IA: %s", e)
@@ -63,17 +60,15 @@ def generate_response(prompt, max_tokens=None):
     """
     if not _check_rate_limit():
         return None
-    if _client is None:
-        st.error("Servicio de IA no inicializado. Recarga la página.")
-        return None
     try:
         tokens = max_tokens or AI_CONFIG.get("max_tokens", 8192)
-        response = _client.models.generate_content(
-            model=AI_CONFIG["model"],
-            contents=prompt,
-            config=types.GenerateContentConfig(max_output_tokens=tokens)
-        )
-        return response.text
+        generation_config = genai.types.GenerationConfig(max_output_tokens=tokens)
+        model = genai.GenerativeModel(AI_CONFIG["model"])
+        response = model.generate_content(prompt, generation_config=generation_config)
+        # Extraer texto ignorando partes de "thinking" si las hay
+        parts = response.candidates[0].content.parts
+        texto = "".join(p.text for p in parts if not getattr(p, "thought", False))
+        return texto if texto else response.text
     except Exception as e:
         logger.error("Error al generar respuesta: %s", e)
         st.error("No se pudo generar la respuesta. Intenta de nuevo en unos segundos.")
