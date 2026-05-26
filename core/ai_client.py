@@ -71,7 +71,7 @@ def generate_response(prompt, max_tokens=None):
         return texto if texto else response.text
     except Exception as e:
         logger.error("Error al generar respuesta: %s", e)
-        st.error(f"[DIAG] {type(e).__name__}: {str(e)[:300]}")
+        st.error("No se pudo generar la respuesta. Intenta de nuevo en unos segundos.")
         return None
 
 
